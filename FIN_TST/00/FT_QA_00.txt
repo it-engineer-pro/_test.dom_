@@ -2,11 +2,13 @@
     Вариант 0. Подготовить окружение для снижения количества проблем при работе по настройке.
     Используемые ВМ:
 1. Клиентский узел 1 - Машина в ALT Wks. Является шлюзом с двумя интерфейсами. ws1.testlab.lan.
-2. Сервер1 - ALTServer1. -- as1.testlab.lan.
-3. Сервер2 - ALTServer2. -- as2.testlab.lan.
-4. Сервер3 - ALTServer3. -- as3.testlab.lan.
-5. Клиентский узел 1 - ALTWks. -- aw1.testlab.lan.
-6. Клиентский узел 2 - ALTWks. -- as2.testlab.lan.
+2. Сервер1 - ALTServer1. -- altsrv1.test.dom.
+3. Сервер2 - ALTServer2. -- altsrv2.test.dom.
+4. Сервер3 - ALTServer3. -- altsrv33.test.dom.
+5. Клиентский узел 1 - ALTWks. -- altwks1.test.dom.
+6. Сервер4 - Astra1 -- astra1.test.dom.
+7. Сервер5 - Astra2 -- astra2.test.dom.
+8. Сервер6 - Astra3 -- astra3.test.dom.
   Целевое состояние.
   Функциональные требования:
   -- Обеспечить подготовку выполнения задачи билета, исключая неявные и не определённые чётко в задании моменты.
