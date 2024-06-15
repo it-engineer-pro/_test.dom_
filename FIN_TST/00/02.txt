@@ -35,8 +35,8 @@ WUDP_PRTS="0:1023"                       # Well-known, privileged port range. UD
 RGST_PRTS="1024:49151"                   # Registered, privileged port range.
 DYNC_PRTS="49152:65535"                  # Dynamic, unprivileged port range.
 UNPR_PRTS="1024:65535"                   # Unprivileged port range.
-# SRV_IF -- change it accordingly with conditions.
-SRV_IF="enp0s10"                         # Internal interface.
+# SRV_IF -- change it accordingly with conditions. test.dom use in all ALTServ ens19 nic
+SRV_IF="ens19"                           # Internal interface.
 # SRV_IP, SRV_IPs -- change it accordingly with conditions, but for documents only,
 # hense script not use server IP in chains.
 SRV_IP="192.168.100.251/24"              # Internal Interface IP address.
@@ -57,6 +57,10 @@ SSH_LCLP="22"                            # _LOCAL_SSHD_ port for remote
 SRV_TCP_IN_PORTS="22,8080,53"            # Local Serviced Port TCP
 SRV_UDP_IN_PORTS="53,123"                # Local Serviced Port TCP
                                          #
+ALTSERV1="192.168.100.251"               # ALTSERV1.test.dom.
+ALTSERV2="192.168.100.252"               # ALTSERV2.test.dom.
+ALTSERV3="192.168.100.253"               # ALTSERV3.test.dom.
+ALTSWKS1="192.168.100.250"               # ALTWKS1.test.dom.
 SRV_TCP_ALLOWOUT="22,80,443,53"          # Local Serviced Port TCP
 SRV_UDP_ALLOWOUT="53,123"                # Local Serviced Port TCP
 ########################################################################
