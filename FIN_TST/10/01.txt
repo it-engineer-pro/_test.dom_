@@ -16,7 +16,7 @@ ALT Linux Bind chrooted enviroment main files and their use:
 • /var/lib/bind/etc/options.conf -- operational level config;
 • /var/lib/bind/etc/rndc.conf -- rnd config and keys;
 
-[root@as1 ~]# ls -la /var/lib/bind/etc/
+[root@altsrv1 ~]# ls -la /var/lib/bind/etc/
 итого 40
 drwx--x--- 2 root named 4096 мая 30 05:17 .
 drwx--x--- 7 root named 4096 мая 30 05:17 ..
@@ -30,9 +30,9 @@ lrwxrwxrwx 1 root root     1 фев 14 18:07 bind -> .
 -rw-r----- 1 root named  113 фев 14 18:07 rndc.conf    -- controls for rndc;
 -rw-r----- 1 root named   42 фев 14 18:07 rndc.key     -- rndc-key need generation;
 lrwxrwxrwx 1 root root     7 фев 14 18:07 zone -> ../zone
-[root@as1 ~]#
+[root@altsrv1 ~]#
 ls -la /var/lib/bind/zone/
-root@as1 bind]# ls -la /var/lib/bind/zone/
+root@altsrv1 bind]# ls -la /var/lib/bind/zone/
 итого 28
 drwxrwx--T 3 root named 4096 мая 30 05:17 .
 drwx--x--- 7 root named 4096 мая 30 05:17 ..
@@ -55,7 +55,7 @@ MASTER:
 5. Avoid to use IPv6, only if you exactly know that is's must included in config. So we shold disable_ipv6 via sysctl or
 disable it for this Bind setup.
 6. We don't use DNSSEC in root server in this setup leastways. We entrust it to Unbound border resolver and point to it our Bind
-server (via forwarders { 192.168.195.10; };), or use 8.8.8.8 or local trusted forwarder.
+server (via forwarders { 192.168.100.253; };), or use 8.8.8.8 or local trusted forwarder.
 SLAVE:
 0. Create and write slave forward and reverse zones in /var/lib/bind/etc/local.conf.
 1. Create zone files on master server.
@@ -93,33 +93,33 @@ include "/etc/bind/rfc1912.conf";
 // Add other zones here
 
 //
-// My TESTLAB.LAN MASTER Zones
+// My test.dom MASTER Zones
 //
-zone "testlab.lan" IN {
+zone "test.dom" IN {
         type master;
         notify yes;
-        also-notify { 192.168.195.2; };
-        allow-transfer { localhost; 192.168.195.2; };
-        file "testlab.lan.zone";
+        also-notify { 192.168.100.252; };
+        allow-transfer { localhost; 192.168.100.252; };
+        file "test.dom.zone";
 //        dnssec-policy default;
 };
 //
 // Reverse TESTLAB:
 //
-zone "195.168.192.in-addr.arpa" IN {
+zone "100.168.192.in-addr.arpa" IN {
         type master;
         notify yes;
-        also-notify { 192.168.195.2; };
-        allow-transfer { localhost; 192.168.195.2; };
-        file "arpa.testlab.lan.zone";
+        also-notify { 192.168.100.252; };
+        allow-transfer { localhost; 192.168.100.252; };
+        file "arpa.test.dom.zone";
 //        dnssec-policy default;
 };
 //
-// Forwarding for OFFICE.TESTLAB.LAN domain and subdomains
+// Forwarding for OFFICE.test.dom domain and subdomains
 //
-zone "office.testlab.lan" {
-    type forward;
-    forwarders { 192.168.195.13; };
+zone "office.test.dom" {
+        type forward;
+        forwarders { 192.168.100.252; };
 };
 //
 zone "." IN {
@@ -134,29 +134,28 @@ nano /var/lib/bind/etc/local.conf
 ---------------------------------------------------------------------------------------------------------------------
 # Then the same way we create the zone files:
 
-cat > /var/lib/bind/zone/testlab.lan.zone <<<'$TTL 1D
-@ IN SOA testlab.lan. root.testlab.lan. (
+cat > /var/lib/bind/zone/test.dom.zone <<<'$TTL 1D
+@ IN SOA test.dom. root.test.dom. (
                   2024060101    ; serial
                   12H           ; refresh
                   1H            ; retry
                   1W            ; expire
                   1H            ; ncache
                   )
-     IN    NS     as1
-     IN    NS     as2
-           MX 10  as1
-as1        A      192.168.195.1
-as2        A      192.168.195.2
-www        CNAME  as3
-aw1        A      192.168.195.11
-aw2        A      192.168.195.12
-as3        A      192.168.195.13
+     IN    NS     altsrv1
+     IN    NS     altsrv2
+           MX 10  altsrv1
+altsrv1    A      192.168.100.251
+altsrv2    A      192.168.100.252
+www        CNAME  altsrv3
+aw1        A      192.168.100.250
+altsrv3    A      192.168.100.253
 '
 
 #check and next
 
-cat > /var/lib/bind/zone/arpa.testlab.lan.zone <<<'$TTL 1D
-@ IN SOA testlab.lan. root.testlab.lan. (
+cat > /var/lib/bind/zone/arpa.test.dom.zone <<<'$TTL 1D
+@ IN SOA test.dom. root.test.dom. (
 ;            2024060101 10800 1800 3600000 259200
                                         2024060101      ; serial
                                         1D              ; refresh
@@ -164,13 +163,12 @@ cat > /var/lib/bind/zone/arpa.testlab.lan.zone <<<'$TTL 1D
                                         1W              ; expire
                                         3H              ; minimum
                                         )
-        IN NS    as1.testlab.lan.
-        IN NS    as2.testlab.lan.
-1       IN PTR   as1.testlab.lan.
-2       IN PTR   as2.testlab.lan.
-13      IN PTR   as13.testlab.lan.
-11      IN PTR   aw1.testlab.lan.
-12      IN PTR   aw2.testlab.lan.
+        IN NS    altsrv1.test.dom.
+        IN NS    altsrv2.test.dom.
+1       IN PTR   altsrv1.test.dom.
+2       IN PTR   altsrv2.test.dom.
+13      IN PTR   altsrv13.test.dom.
+11      IN PTR   aw1.test.dom.
 '
 ---------------------------------------------------------------------------------------------------------------------
 #
@@ -183,10 +181,10 @@ cat > /var/lib/bind/etc/options.conf <<<'options {
         statistics-file "/var/run/named.stats";
         recursing-file "/var/run/recursing";
         pid-file none;
-//        listen-on { 127.0.0.1; 192.168.195.1; };
-        listen-on port 53 { 127.0.0.1; 192.168.195.1; };
+//        listen-on { 127.0.0.1; 192.168.100.251; };
+        listen-on port 53 { 127.0.0.1; 192.168.100.251; };
         forward only;
-        forwarders { 192.168.195.10; };
+        forwarders { 192.168.100.253; };
 //        allow-query { localnets; };
 //        allow-query-cache { localnets; };
         recursion yes;
@@ -225,22 +223,22 @@ cat > /var/lib/bind/etc/options.conf <<<'options {
 };
 // ACLs
 acl "serviced" {
-        192.168.195.0/24;
+        192.168.100.0/24;
         localhost;
         localnets;
 };
 acl "local-clients" {
-        192.168.195.0/24;
+        192.168.100.0/24;
 };
 acl "local-servers" {
-        192.168.195.1;
-        192.168.195.2;
+        192.168.100.251;
+        192.168.100.252;
 };
 acl "local-root-server" {
-        192.168.195.1;
+        192.168.100.251;
 };
 acl "local-dns-gw-server" {
-        192.168.195.10;
+        192.168.100.253;
 };
 //
 logging {
