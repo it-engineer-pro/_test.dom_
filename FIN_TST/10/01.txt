@@ -1,0 +1,364 @@
+---------------------------------------------------------------------------------------------------------------------
+MASTER/SLAVE BIND LAB. MASTER PART.
+(logging not enabled, option -4 not used)
+---------------------------------------------------------------------------------------------------------------------
+AS1/MASTER:
+---------------------------------------------------------------------------------------------------------------------
+apt-get install bind bind-utils nano
+---------------------------------------------------------------------------------------------------------------------
+ALT Linux Bind chrooted enviroment main files and their use:
+---------------------------------------------------------------------------------------------------------------------
+• /var/lib/bind  -- chroot directory;
+• /var/lib/bind/zone -- zones itself files placement;
+• /var/lib/bind/etc  -- config fiiles placement;
+• /var/lib/bind/etc/named.conf -- primary Bind config file (master/slave, work mode, );
+• /var/lib/bind/etc/local.conf -- local zones links (short description);
+• /var/lib/bind/etc/options.conf -- operational level config;
+• /var/lib/bind/etc/rndc.conf -- rnd config and keys;
+
+[root@as1 ~]# ls -la /var/lib/bind/etc/
+итого 40
+drwx--x--- 2 root named 4096 мая 30 05:17 .
+drwx--x--- 7 root named 4096 мая 30 05:17 ..
+lrwxrwxrwx 1 root root     1 фев 14 18:07 bind -> .
+-rw-r----- 1 root named 1991 фев 14 18:07 bind.keys    -- trust-anchors for DNSSEC;
+-rw-r----- 1 root named  183 фев 14 18:07 local.conf   -- Add other zones here. And RFC 1912, 1918 includes;
+-rw-r----- 1 root named  259 фев 14 18:07 named.conf   -- primary configuration file for the BIND DNS server named with includes;
+-rw-r----- 1 root named 2923 фев 14 18:07 options.conf -- acl, options {}, logging {}, etc (forwarders, allow-query, allow-transfer, ... );
+-rw-r----- 1 root named  564 фев 14 18:07 rfc1912.conf -- config with localhost/localdomain/and PTRs;
+-rw-r----- 1 root named 1515 фев 14 18:07 rfc1918.conf -- config with rfc1918 zones;
+-rw-r----- 1 root named  113 фев 14 18:07 rndc.conf    -- controls for rndc;
+-rw-r----- 1 root named   42 фев 14 18:07 rndc.key     -- rndc-key need generation;
+lrwxrwxrwx 1 root root     7 фев 14 18:07 zone -> ../zone
+[root@as1 ~]#
+ls -la /var/lib/bind/zone/
+root@as1 bind]# ls -la /var/lib/bind/zone/
+итого 28
+drwxrwx--T 3 root named 4096 мая 30 05:17 .
+drwx--x--- 7 root named 4096 мая 30 05:17 ..
+-rw-r----- 1 root named  212 фев 14 18:07 127.in-addr.arpa -- PTR LOCALHOST;
+-rw-r----- 1 root named  309 фев 14 18:07 empty            -- EMPTY TEMPLATE;
+-rw-r----- 1 root named  208 фев 14 18:07 localdomain      -- LOCALDOMAIN;
+-rw-r----- 1 root named  178 фев 14 18:07 localhost        -- LOCALHOST;
+drwx------ 2 root named 4096 фев 14 18:07 slave            -- SLAVE SERVER ZONES FOLDER;
+
+---------------------------------------------------------------------------------------------------------------------
+In ALT Linux Bind enviroment not same as in RHEL or BSD ones. So we should be accurate and careful.
+---------------------------------------------------------------------------------------------------------------------
+#The action plan in short:
+MASTER:
+0. Describe master forward and reverse zones in /var/lib/bind/etc/local.conf.
+1. Create zone files on master server. Forward and Reverse.
+2. Make its own options config for your current enviroment.
+3. Create "."-hint zone, and copy it from fresh ftp-version. From here https://www.iana.org/domains/root/files .
+4. Create and include rndc key and setup rndc tool.
+5. Avoid to use IPv6, only if you exactly know that is's must included in config. So we shold disable_ipv6 via sysctl or
+disable it for this Bind setup.
+6. We don't use DNSSEC in root server in this setup leastways. We entrust it to Unbound border resolver and point to it our Bind
+server (via forwarders { 192.168.195.10; };), or use 8.8.8.8 or local trusted forwarder.
+SLAVE:
+0. Create and write slave forward and reverse zones in /var/lib/bind/etc/local.conf.
+1. Create zone files on master server.
+
+---------------------------------------------------------------------------------------------------------------------
+# Make backup for our operational files:
+mkdir /root/backup/
+cp /var/lib/bind/etc/named.conf /root/backup/named.conf
+cp /var/lib/bind/etc/local.conf /root/backup/local.conf
+cp /var/lib/bind/etc/options.conf /root/backup/options.conf
+cp /var/lib/bind/etc/rndc.conf /root/backup/rndc.conf
+# and reset their content without file deletion:
+echo -n "" > /var/lib/bind/etc/named.conf
+echo -n "" > /var/lib/bind/etc/local.conf
+echo -n "" > /var/lib/bind/etc/options.conf
+echo -n "" > /var/lib/bind/etc/rndc.conf
+---------------------------------------------------------------------------------------------------------------------
+# Use DocHere trick for quick add settings:
+cat > /var/lib/bind/etc/test.sh <<<'#!/bin/bash
+#
+#
+ls -la
+'
+---------------------------------------------------------------------------------------------------------------------
+# SAME WAY:
+cd /var/lib/bind/etc
+
+cat > /var/lib/bind/etc/local.conf <<<'//
+// nano /var/lib/bind/etc/local.conf
+//
+include "/etc/bind/rfc1912.conf";
+// Consider adding the 1918 zones here,
+// if they are not used in your organization.
+//	include "/etc/bind/rfc1918.conf";
+// Add other zones here
+
+//
+// My TESTLAB.LAN MASTER Zones
+//
+zone "testlab.lan" IN {
+        type master;
+        notify yes;
+        also-notify { 192.168.195.2; };
+        allow-transfer { localhost; 192.168.195.2; };
+        file "testlab.lan.zone";
+//        dnssec-policy default;
+};
+//
+// Reverse TESTLAB:
+//
+zone "195.168.192.in-addr.arpa" IN {
+        type master;
+        notify yes;
+        also-notify { 192.168.195.2; };
+        allow-transfer { localhost; 192.168.195.2; };
+        file "arpa.testlab.lan.zone";
+//        dnssec-policy default;
+};
+//
+// Forwarding for OFFICE.TESTLAB.LAN domain and subdomains
+//
+zone "office.testlab.lan" {
+    type forward;
+    forwarders { 192.168.195.13; };
+};
+//
+zone "." IN {
+        type hint;
+        file "named.root";
+};
+'
+
+---------------------------------------------------------------------------------------------------------------------
+# Use cat or nano for control:
+nano /var/lib/bind/etc/local.conf
+---------------------------------------------------------------------------------------------------------------------
+# Then the same way we create the zone files:
+
+cat > /var/lib/bind/zone/testlab.lan.zone <<<'$TTL 1D
+@ IN SOA testlab.lan. root.testlab.lan. (
+                  2024060101    ; serial
+                  12H           ; refresh
+                  1H            ; retry
+                  1W            ; expire
+                  1H            ; ncache
+                  )
+     IN    NS     as1
+     IN    NS     as2
+           MX 10  as1
+as1        A      192.168.195.1
+as2        A      192.168.195.2
+www        CNAME  as3
+aw1        A      192.168.195.11
+aw2        A      192.168.195.12
+as3        A      192.168.195.13
+'
+
+#check and next
+
+cat > /var/lib/bind/zone/arpa.testlab.lan.zone <<<'$TTL 1D
+@ IN SOA testlab.lan. root.testlab.lan. (
+;            2024060101 10800 1800 3600000 259200
+                                        2024060101      ; serial
+                                        1D              ; refresh
+                                        1H              ; retry
+                                        1W              ; expire
+                                        3H              ; minimum
+                                        )
+        IN NS    as1.testlab.lan.
+        IN NS    as2.testlab.lan.
+1       IN PTR   as1.testlab.lan.
+2       IN PTR   as2.testlab.lan.
+13      IN PTR   as13.testlab.lan.
+11      IN PTR   aw1.testlab.lan.
+12      IN PTR   aw2.testlab.lan.
+'
+---------------------------------------------------------------------------------------------------------------------
+#
+# Then we should write options.conf file. It respond for many nuances of work for our resolver.
+#
+cat > /var/lib/bind/etc/options.conf <<<'options {
+        version "unknown";
+        directory "/etc/bind/zone";
+        dump-file "/var/run/named_dump.db";
+        statistics-file "/var/run/named.stats";
+        recursing-file "/var/run/recursing";
+        pid-file none;
+//        listen-on { 127.0.0.1; 192.168.195.1; };
+        listen-on port 53 { 127.0.0.1; 192.168.195.1; };
+        forward only;
+        forwarders { 192.168.195.10; };
+//        allow-query { localnets; };
+//        allow-query-cache { localnets; };
+        recursion yes;
+//       allow-recursion { serviced; };
+//      max-cache-ttl 86400;
+//      interface-interval 0;
+        querylog yes;
+        dnssec-validation no;
+//
+        allow-query {
+                "localhost";
+                "localnets";
+                "local-clients";
+                };
+//
+        allow-query-cache {
+                "localhost";
+                "localnets";
+                "local-clients";
+                };
+        max-cache-ttl 86400;
+//
+        allow-recursion {
+                "localhost";
+                "localnets";
+                "local-servers";
+                "local-root-server";
+                "local-dns-gw-server";
+                };
+
+        allow-transfer {
+                "localhost";
+                "local-servers";
+                "local-root-server";
+                };
+};
+// ACLs
+acl "serviced" {
+        192.168.195.0/24;
+        localhost;
+        localnets;
+};
+acl "local-clients" {
+        192.168.195.0/24;
+};
+acl "local-servers" {
+        192.168.195.1;
+        192.168.195.2;
+};
+acl "local-root-server" {
+        192.168.195.1;
+};
+acl "local-dns-gw-server" {
+        192.168.195.10;
+};
+//
+logging {
+//        channel default_debug {
+//              file "/var/log/named.run" versions 10 size 20m;
+//              print-time yes;
+//              print-category yes;
+//              print-severity yes;
+//              severity dynamic;
+//         };
+//        channel default_debug {
+//                file "/var/log/named.run" versions 10 size 20m;
+//                severity dynamic;
+//        };
+// transfers
+//        category notify { zone_transfer_log; };
+//        category xfer-in { zone_transfer_log; };
+//        category xfer-out { zone_transfer_log; };
+//        channel zone_transfer_log {
+//                file "/var/log/transfer.log" versions 10 size 50m;
+//                print-time yes;
+//                print-category yes;
+//                print-severity yes;
+//                severity info;
+//        };
+// queries
+//        category queries { queries_log; };
+//        channel queries_log {
+//                file "/var/log/queries.log" versions 10 size 50m;
+//                print-time yes;
+//                print-category yes;
+//                print-severity yes;
+//                severity info;
+//        };
+};
+// Controls
+controls {
+//
+        inet 127.0.0.1 port 953 allow {
+                "localhost";
+        }
+        keys {
+                "rndc-key";
+        };
+};
+'
+#
+#
+#
+---------------------------------------------------------------------------------------------------------------------
+# At the root DNS-server we should use fresh root-hint zone-file for "."-zone.
+# RUN IT
+wget -nv -O /var/lib/bind/zone/named.root https://www.internic.net/domain/named.root
+And we placed it in included "/etc/bind/local.conf" as:
+zone "." IN {
+        type hint;
+        file "named.root";
+};
+
+---------------------------------------------------------------------------------------------------------------------
+# Recreate named.conf
+# for complex config
+#
+cat > /var/lib/bind/etc/named.conf <<<'//
+// This is the primary configuration file for the BIND DNS server named.
+// If you are just adding zones, please do that in /var/lib/bind/etc/bind/local.conf
+//
+include "/etc/bind/options.conf";
+include "/etc/bind/rndc.conf";
+include "/etc/bind/local.conf";
+#
+'
+#
+---------------------------------------------------------------------------------------------------------------------
+# Recreate rndc.conf with minimall affect:
+#
+cat > /var/lib/bind/etc/rndc.conf <<<'controls {
+        inet 127.0.0.1 port 953 allow { localhost; } keys { "rndc-key"; };
+};
+include "/etc/bind/rndc.key";
+'
+#
+#
+cp /var/lib/bind/etc/rndc.key /root/backup/rndc.key
+rndc-confgen >rndc.key
+
+use 'nano rndc.key' and rem options block
+# Start of rndc.conf
+key "rndc-key" {
+        algorithm hmac-sha256;
+        secret "XNjcTiUNq90A18orG5FdKebh+QVWOaDCRXZuxdInMNM=";
+};
+
+#options {
+#       default-key "rndc-key";
+#       default-server 127.0.0.1;
+#       default-port 953;
+#};
+# End of rndc.conf
+
+# Use with the following in named.conf, adjusting the allow list as needed:
+# key "rndc-key" {
+#       algorithm hmac-sha256;
+#       secret "XNjcTiUNq90A18orG5FdKebh+QVWOaDCRXZuxdInMNM=";
+# };
+#
+# controls {
+#       inet 127.0.0.1 port 953
+#               allow { 127.0.0.1; } keys { "rndc-key"; };
+# };
+# End of named.conf
+
+---------------------------------------------------------------------------------------------------------------------
+
+
+---------------------------------------------------------------------------------------------------------------------
+use named-checkconf and fix errors if you take them
+systemctl start bind.service
+systemctl status bind.service
+journalctl -xeu bind.service
+---------------------------------------------------------------------------------------------------------------------
