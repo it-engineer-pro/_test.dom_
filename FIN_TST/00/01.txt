@@ -30,10 +30,10 @@ ls /etc/net/ifaces
 
 mkdir /root/backup
 mkdir /etc/net/ifaces/enp0s9
-mkdir /etc/net/ifaces/enp0s10
+mkdir /etc/net/ifaces/ens19
 
-# internal address for enp0s10
-cat > /etc/net/ifaces/enp0s10/ipv4address <<<'192.168.100.253/24'
+# internal address for ens19
+cat > /etc/net/ifaces/ens19/ipv4address <<<'192.168.100.253/24'
 
 # point to external ip gw here.
 cat > /etc/net/ifaces/enp0s9/ipv4route <<<'default via 192.168.92.11'
@@ -42,8 +42,9 @@ cat > /etc/net/ifaces/enp0s9/ipv4route <<<'default via 192.168.92.11'
 cat > /etc/net/ifaces/enp0s9/resolv.conf <<<'nameserver 192.168.92.11
 search test.dom'
 
+cp /etc/net/ifaces/ens19/options /root/backup/ens19-options
 # setup enp0s9 options
-cat > /etc/net/ifaces/enp0s9/options <<<'BOOTPROTO=static
+cat > /etc/net/ifaces/ens19/options <<<'BOOTPROTO=static
 TYPE=eth
 CONFIG_WIRELESS=no
 SYSTEMD_BOOTPROTO=static
@@ -52,8 +53,8 @@ DISABLED=no
 NM_CONTROLLED=no
 SYSTEMD_CONTROLLED=no'
 
-# setup enp0s10 options (test.dom)
-cat > /etc/net/ifaces/enp0s10/options <<<'BOOTPROTO=static
+# setup ens19 options (test.dom)
+cat > /etc/net/ifaces/ens19/options <<<'BOOTPROTO=static
 TYPE=eth
 CONFIG_WIRELESS=no
 SYSTEMD_BOOTPROTO=static
@@ -104,8 +105,8 @@ cp /etc/unbound/root.hints /var/lib/unbound/root.hints
 cat > /etc/unbound/unbound.conf <<<'server:
         interface: 192.168.100.253
         port: 53
-# point to external IP-address here
-        outgoing-interface: 192.168.92.90
+# point to external IP-address here static/dhcp?
+        outgoing-interface: 192.168.1.183
         prefer-ip4: yes
         do-ip4: yes
         do-ip6: no
@@ -135,8 +136,9 @@ forward-zone:
       name: "."
 # point to external DNS server here
 # point to external DNS Resolver or to 8.8.8.8
-      forward-addr: 192.168.92.11
+#      forward-addr: 192.168.92.11
 #      forward-addr: 8.8.8.8
+      forward-addr: 77.88.8.8
       forward-first: no
       forward-no-cache: no'
 
@@ -159,10 +161,10 @@ iptables-save > /etc/sysconfig/iptables
 #/sbin/iptables -t nat -A POSTROUTING -s 192.168.95.0/24 -d 0/0 -o enp0s3 -j SNAT --to-source 192.168.105.95
 
 #/sbin/iptables -A FORWARD -i enp0s8 -o enp0s3 -s 192.168.95.0/24 -j ACCEPT
-/sbin/iptables -A FORWARD -i enp0s10 -o enp0s3 -s 192.168.100.0/24 -j ACCEPT
+/sbin/iptables -A FORWARD -i ens19 -o enp0s3 -s 192.168.100.0/24 -j ACCEPT
 
 #/sbin/iptables -A FORWARD -i enp0s3 -o enp0s8 -m state --state ESTABLISHED,RELATED -j ACCEPT
-/sbin/iptables -A FORWARD -i enp0s3 -o enp0s10 -m state --state ESTABLISHED,RELATED -j ACCEPT
+/sbin/iptables -A FORWARD -i enp0s3 -o ens19 -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 systemctl enable --now iptables
 systemctl status iptables
@@ -176,9 +178,9 @@ sysadmin/altsrv1
 su -
 mkdir /root/backup
 ip a
-ls -la /etc/net/ifaces/enp0s10
-touch /etc/net/ifaces/enp0s10/ipv4address
-cat > /etc/net/ifaces/enp0s10/ipv4address <<<'192.168.100.251/24'
+ls -la /etc/net/ifaces/ens19
+touch /etc/net/ifaces/ens19/ipv4address
+cat > /etc/net/ifaces/ens19/ipv4address <<<'192.168.100.251/24'
 systemctl restart network
 exit
 
@@ -188,11 +190,11 @@ ssh-copy-id -i ~/.ssh/access-key-rsa.pub sysadmin@altsrv1
 
 sysadmin@altsrv1
 su -
-cat > /etc/net/ifaces/enp0s10/ipv4address <<<'192.168.100.251/24'
-cat > /etc/net/ifaces/enp0s10/ipv4route <<<'default via 192.168.100.253'
-cat > /etc/net/ifaces/enp0s10/resolv.conf <<<'nameserver 192.168.100.253
+#cat > /etc/net/ifaces/ens19/ipv4address <<<'192.168.100.251/24'
+#cat > /etc/net/ifaces/ens19/ipv4route <<<'default via 192.168.100.253'
+cat > /etc/net/ifaces/ens19/resolv.conf <<<'nameserver 192.168.100.253
 search test.dom'
-cat > /etc/net/ifaces/enp0s10/options <<<'BOOTPROTO=static
+cat > /etc/net/ifaces/ens19/options <<<'BOOTPROTO=static
 TYPE=eth
 CONFIG_WIRELESS=no
 SYSTEMD_BOOTPROTO=static
@@ -239,17 +241,17 @@ chronyc sources
 ** ALTSRV2
 sysadmin@altsrv2
 su -
-cat > /etc/net/ifaces/enp0s10/ipv4address <<<'192.168.100.252/24'
+cat > /etc/net/ifaces/ens19/ipv4address <<<'192.168.100.252/24'
 systemctl restart network
 
 sysadmin@altsrv3
 su -
 ssh-copy-id -i ~/.ssh/access-key-rsa.pub sysadmin@altsrv2
 
-cat > /etc/net/ifaces/enp0s10/ipv4route <<<'default via 192.168.100.253'
-cat > /etc/net/ifaces/enp0s10/resolv.conf <<<'nameserver 192.168.100.253
+#cat > /etc/net/ifaces/ens19/ipv4route <<<'default via 192.168.100.253'
+cat > /etc/net/ifaces/ens19/resolv.conf <<<'nameserver 192.168.100.253
 search test.dom'
-cat > /etc/net/ifaces/enp0s10/options <<<'BOOTPROTO=static
+cat > /etc/net/ifaces/ens19/options <<<'BOOTPROTO=static
 TYPE=eth
 CONFIG_WIRELESS=no
 SYSTEMD_BOOTPROTO=static
@@ -301,9 +303,9 @@ su -
 systemctl enable --now sshd
 
 mkdir /root/backup
-mv /etc/net/ifaces/enp0s10/options /root/backup/options
-cat > /etc/net/ifaces/enp0s10/ipv4address <<<'192.168.100.250/24'
-cat > /etc/net/ifaces/enp0s10/options <<<'NM_CONTROLLED=yes
+mv /etc/net/ifaces/ens19/options /root/backup/options
+cat > /etc/net/ifaces/ens19/ipv4address <<<'192.168.100.250/24'
+cat > /etc/net/ifaces/ens19/options <<<'NM_CONTROLLED=yes
 DISABLED=yes
 TYPE=eth
 CONFIG_WIRELESS=no
@@ -321,8 +323,8 @@ ssh-copy-id -i ~/.ssh/access-key-rsa.pub sysadmin@altwks1
 ssh sysadmin@altwks1
 su -
 
-cat > /etc/net/ifaces/enp0s10/ipv4route <<<'default via 192.168.100.253'
-cat > /etc/net/ifaces/enp0s10/resolv.conf <<<'nameserver 192.168.100.253
+cat > /etc/net/ifaces/ens19/ipv4route <<<'default via 192.168.100.253'
+cat > /etc/net/ifaces/ens19/resolv.conf <<<'nameserver 192.168.100.253
 search test.dom'
 
 mkdir /root/backup
@@ -392,7 +394,7 @@ apt-get install dnsutils
 sa@astra2
 su -
 
-cat > /etc/net/ifaces/enp0s10/ipv4address <<<'192.168.100.242/24'
+cat > /etc/net/ifaces/ens19/ipv4address <<<'192.168.100.242/24'
 systemctl restart network
 exit
 
@@ -400,10 +402,10 @@ sa@astra2
 su -
 ssh-copy-id -i ~/.ssh/access-key-rsa.pub sa@astra2
 
-cat > /etc/net/ifaces/enp0s10/ipv4route <<<'default via 192.168.100.253'
-cat > /etc/net/ifaces/enp0s10/resolv.conf <<<'nameserver 192.168.100.253
+cat > /etc/net/ifaces/ens19/ipv4route <<<'default via 192.168.100.253'
+cat > /etc/net/ifaces/ens19/resolv.conf <<<'nameserver 192.168.100.253
 search test.dom'
-cat > /etc/net/ifaces/enp0s10/options <<<'BOOTPROTO=static
+cat > /etc/net/ifaces/ens19/options <<<'BOOTPROTO=static
 TYPE=eth
 CONFIG_WIRELESS=no
 SYSTEMD_BOOTPROTO=static
