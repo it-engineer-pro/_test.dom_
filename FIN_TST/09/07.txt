@@ -11,7 +11,7 @@ apt-get install dhcp-server bind
 $ cp /etc/dhcp/dhcpd.conf.sample /etc/dhcp/dhcpd.conf
 
 $ cat /etc/sysconfig/dhcpd
-DHCPDARGS=ens0
+DHCPDARGS=ens19
 . . .
 
 /etc/dhcp/dhcpd.conf
@@ -20,9 +20,9 @@ DHCPDARGS=ens0
 mkdir /etc/dhcp/dhcpd.d
 cd /etc/dhcp/dhcpd.d
 touch failover.conf subnet.conf static.conf
-touch /etc/dhcp/dhcpd.d/failover.conf
-touch /etc/dhcp/dhcpd.d/subnet.conf
-touch /etc/dhcp/dhcpd.d/static.conf
+#touch /etc/dhcp/dhcpd.d/failover.conf
+#touch /etc/dhcp/dhcpd.d/subnet.conf
+#touch /etc/dhcp/dhcpd.d/static.conf
 !
 pwd
 /etc/dhcp/dhcpd.d
@@ -38,6 +38,11 @@ key "DHCP.OMAPI" {
 
 cat /etc/dhcp/dhcpd.conf
 # See dhcpd.conf(5) for further configuration
+###############################################################
+#### secret NqBLABLAegQIwM0gpLAs3F/FC5oBLABLAzNlsgS4PYM=;  ####
+#### secret parameter here without "..."                   ####
+#### secret used ONE in BOTH sides of failover             ####
+###############################################################
 authoritative;
 
 ddns-update-style none;
@@ -98,7 +103,7 @@ failover peer "failover-partner" {
 
 
 cat /etc/dhcp/dhcpd.d/subnet.conf
-subnet 192.168.135.0 netmask 255.255.255.0 {
+subnet 192.168.100.0 netmask 255.255.255.0 {
         option routers                  192.168.100.253;
         option subnet-mask              255.255.255.0;
         option nis-domain               "test.dom";
@@ -111,6 +116,10 @@ subnet 192.168.135.0 netmask 255.255.255.0 {
             range 192.168.100.10 192.168.100.230;
         }
 }
+
+##################################################
+#### RESERVATIONs MUST BE IN POOL and REAL!!! ####
+##################################################
 
 [root@altsrv1 ~]# cat /etc/dhcp/dhcpd.d/static.conf
 host altwks1 {
@@ -207,24 +216,25 @@ subnet 192.168.100.0 netmask 255.255.255.0 {
 }
 [root@altsrv1 dhcpd.d]#
 [root@altsrv1 dhcpd.d]# cat /etc/dhcp/dhcpd.d/static.conf
-host altwks1 {
-    hardware ethernet 08:00:27:9d:15:40;
-    fixed-address 192.168.100.250;
-}
-
-host astra1 {
-    hardware ethernet 08:00:27:29:a5:d3;
-    fixed-address 192.168.100.240;
-}
-
-host astra2 {
-    hardware ethernet 08:00:27:95:3e:e5;
-    fixed-address 192.168.100.241;
-}
-
-host astra3 {
-    hardware ethernet 08:00:27:95:3e:e5;
-    fixed-address 192.168.100.242;
+# some host in range...
+#host altwks1 {
+#    hardware ethernet 08:00:27:9d:15:40;
+#    fixed-address 192.168.100.250;
+#}
+# some another host in range
+#host astra1 {
+#    hardware ethernet 08:00:27:29:a5:d3;
+#    fixed-address 192.168.100.240;
+#}
+# etc
+#host astra2 {
+#    hardware ethernet 08:00:27:95:3e:e5;
+#    fixed-address 192.168.100.241;
+#}
+# again
+#host astra3 {
+#    hardware ethernet 08:00:27:95:3e:e5;
+#    fixed-address 192.168.100.242;
 
 
 [root@altsrv1 dhcpd.d]#
