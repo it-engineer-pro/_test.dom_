@@ -42,6 +42,11 @@ cat /etc/dhcp/dhcpd.conf
 #### secret NqBLABLAegQIwM0gpLAs3F/FC5oBLABLAzNlsgS4PYM=;  ####
 #### secret parameter here without "..."                   ####
 #### secret used ONE in BOTH sides of failover             ####
+#### static reservation don't cross with subnet range      ####
+#### hense service will show error in status               ####
+#### subnetwork range is dinamyc, static -- naturally      ####
+#### static is. Active state, reservation see in messages  ####
+#### file (var/lib/dhcp/dhcpd/state/dhcpd.leases)          ####
 ###############################################################
 authoritative;
 
@@ -129,17 +134,17 @@ host altwks1 {
 
 host astra1 {
     hardware ethernet 08:00:27:29:a5:d3;
-    fixed-address 192.168.100.240;
+    fixed-address 192.168.100.241;
 }
 
 host astra2 {
     hardware ethernet 08:00:27:95:3e:e5;
-    fixed-address 192.168.100.241;
+    fixed-address 192.168.100.242;
 }
 
 host astra3 {
-    hardware ethernet 08:00:27:95:3e:e5;
-    fixed-address 192.168.100.242;
+    hardware ethernet 08:00:27:aa:ee:e5;
+    fixed-address 192.168.100.243;
 }
 
 
@@ -564,4 +569,9 @@ enp0s10: leased 192.168.100.12 for 21600 seconds
 enp0s10: adding route to 192.168.100.0/24
 enp0s10: adding default route via 192.168.100.253
 [root@altwks2 ~]#
+
+------------------------------------------------------------------------
+NEXT STEPS: In addition we need setup iptables packet flow for usind 
+DHCP with some basic enviroment security:
+------------------------------------------------------------------------
 
