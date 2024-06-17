@@ -179,7 +179,7 @@ $IPT -t mangle -A _BAD_TCP_ -f -j _LOG_DROP_
 $IPT -t mangle -A _BAD_TCP_ -j RETURN
 
 ########################################################################
-# Port Scan Protection Rules. (Use it with careful.):
+# Port Scan Protection Rules. (_Use it with careful_.):
 # ===================
 ########################################################################
 #$IPT -t filter -A INPUT -p tcp -j _PORT_SCAN_
