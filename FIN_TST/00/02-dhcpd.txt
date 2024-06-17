@@ -36,7 +36,7 @@ RGST_PRTS="1024:49151"                   # Registered, privileged port range.
 DYNC_PRTS="49152:65535"                  # Dynamic, unprivileged port range.
 UNPR_PRTS="1024:65535"                   # Unprivileged port range.
 # SRV_IF -- change it accordingly with conditions.
-SRV_IF="enp0s10"                         # Internal interface.
+SRV_IF="ens19"                           # Internal interface.
 # SRV_IP, SRV_IPs -- change it accordingly with conditions, but for documents only,
 # hense script not use server IP in chains.
 SRV_IP="192.168.100.251/24"              # Internal Interface IP address.
@@ -215,6 +215,8 @@ $IPT -A _LIMIT_CTRL_ -j RETURN
 $IPT -A FORWARD -p udp -s 0.0.0.0 -j _DHCPD_SERVICE_
 $IPT -A INPUT -i $SRV_IF -p udp --dport 67 -j _DHCPD_SERVICE_
 $IPT -A OUTPUT -o $SRV_IF -p udp --sport 67 -j _DHCPD_SERVICE_
+$IPT -A INPUT -i $SRV_IF -p tcp --dport 519:520 -j _DHCPD_SERVICE_
+$IPT -A OUTPUT -o $SRV_IF -p tcp --dport 519:520 -j _DHCPD_SERVICE_
 #
 # DHCPd packets logging first:
                                 #_-s0.0.0.0-udp67-fw_log_
@@ -241,6 +243,25 @@ $IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p udp --sport 67 --dport 67 \
                                 #_-udp67-out_logaccept_
 $IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p udp --sport 67 --dport 68 \
                         -m conntrack --ctstate NEW -j _LOG_ACCEPT_
+
+#
+# DHCPd Failover packets logging:
+                                #_-tcp519:520-in_log_
+$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p tcp --sport $UNPR_PRTS --dport 519:520 \
+                        --syn -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DHCP_failover: "
+
+                                #_-tcp519:520-out_log_
+$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p tcp --sport $UNPR_PRTS --dport 519:520 \
+                        --syn -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DHCP_failover: "
+
+                                #_-tcp519:520-in_logaccept_
+$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p tcp --sport $UNPR_PRTS --dport 519:520 \
+                        --syn -m conntrack --ctstate NEW -j _LOG_ACCEPT_
+
+                                #_-tcp519:520-out_logaccept_
+$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p tcp --sport $UNPR_PRTS --dport 519:520 \
+                        --syn -m conntrack --ctstate NEW -j _LOG_ACCEPT_
+
 #
 # RETURN Broadcasts to TCP Flow, to other chain or to _LOG_FILTER_
 $IPT -A _DHCPD_SERVICE_ -j RETURN
