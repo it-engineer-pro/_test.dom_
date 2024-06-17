@@ -1,0 +1,327 @@
+Allow DNS-forwarding on master, or not -- that's the question...
+___________________________________________________________________________
+nano /var/lib/bind/etc/local.conf 
+...
+//
+// Forwarding for OFFICE.test.dom domain and subdomains
+//
+//zone "office.test.dom" {
+//        type forward;
+//        forwarders { 192.168.100.252; };
+//};
+//
+...
+ctrl+o
+___________________________________________________________________________
+Shall create sub-zone with delegated subdomain in master BIND DNS server.
+___________________________________________________________________________
+$TTL 1D
+@                  IN SOA test.dom. root.test.dom. (
+                                       2024061802
+                                       1d
+                                       1h
+                                       1w
+                                       3h )
+                   IN NS altsrv1.test.dom.
+                   IN NS altsrv2.test.dom.
+                   MX 10  altsrv1
+altsrv1            IN A  192.168.100.251
+altsrv2            IN A  192.168.100.252
+altsrv3            IN A  192.168.100.253
+www                CNAME astra1
+www                IN A  192.168.100.240
+astra1             IN A  192.168.100.241
+astra3             IN A  192.168.100.243
+# Subdomain OFFICE.test.dom.
+office             IN NS altsrv2.test.dom.
+altsrv2            IN A  192.168.100.252
+
+___________________________________________________________________________
+And reverse too:
+
+$TTL 1D
+@                  IN SOA test.dom. root.test.dom. (
+;                                       2024060101 10800 1800 3600000 259200
+                                        2024061802      ; serial
+                                        1D              ; refresh
+                                        1H              ; retry
+                                        1W              ; expire
+                                        3H              ; minimum
+                                        )
+                   IN NS    altsrv1.test.dom.
+                   IN NS    altsrv2.test.dom.
+251                IN PTR   altsrv1.test.dom.
+252                IN PTR   altsrv2.test.dom.
+253                IN PTR   altsrv3.test.dom.
+241                IN PTR   astra1.test.dom.
+243                IN PTR   astra3.test.dom.
+
+___________________________________________________________________________
+
+and change it in designated zone in master BIND server.
+
+cp /var/lib/bind/zone/test.dom.zone /root/backup/test.dom.zone
+# Then the same way we create the zone files:
+
+cat > /var/lib/bind/zone/test.dom.zone <<<'$TTL 1D
+@                  IN SOA test.dom. root.test.dom. (
+                                       2024061802
+                                       12h
+                                       15m
+                                       3w
+                                       1d )
+                   IN NS altsrv1.test.dom.
+                   IN NS altsrv2.test.dom.
+                   MX 10  altsrv1
+altsrv1            IN A  192.168.100.251
+altsrv2            IN A  192.168.100.252
+altsrv3            IN A  192.168.100.253
+www                CNAME astra1
+www                IN A  192.168.100.240
+astra1             IN A  192.168.100.241
+astra3             IN A  192.168.100.243
+# Subdomain OFFICE.test.dom.
+office             IN NS altsrv2.test.dom.
+altsrv2            IN A  192.168.100.252
+'
+cp /var/lib/bind/zone/arpa.test.dom.zone /root/backup/arpa.test.dom.zone
+#check and next
+cat > /var/lib/bind/zone/arpa.test.dom.zone <<<'$TTL 1D
+@                  IN SOA test.dom. root.test.dom. (
+;                                       2024060101 10800 1800 3600000 259200
+                                        2024061802      ; serial
+                                        1D              ; refresh
+                                        1H              ; retry
+                                        1W              ; expire
+                                        3H              ; minimum
+                                        )
+                   IN NS    altsrv1.test.dom.
+                   IN NS    altsrv2.test.dom.
+251                IN PTR   altsrv1.test.dom.
+252                IN PTR   altsrv2.test.dom.
+253                IN PTR   altsrv3.test.dom.
+241                IN PTR   astra1.test.dom.
+243                IN PTR   astra3.test.dom.
+'
+then
+named-checkzone test.dom. /var/lib/bind/zone/test.dom.zone
+systemctl restart bind
+systemctl status bind
+___________________________________________________________________________
+
+then go to SLAVE and create and describe zone in appropriate files
+nano /var/lib/bind/etc/local.conf 
+touch /var/lib/bind/zone/office.test.dom.zone
+touch /var/lib/bind/zone/arpa.test.dom.zone
+chown named:named /var/lib/bind/zone/office.test.dom.zone
+chown named:named /var/lib/bind/zone/arpa.test.dom.zone
+usermod -aG named sysadmin
+newgrp sysadmin
+id sysadmin
+id -g
+exec su -l $USER
+
+cat > /var/lib/bind/zone/office.test.dom.zone <<<'$TTL 1D
+@                  IN SOA office.test.dom. root.office.test.dom. (
+                                       2024061802
+                                       12h
+                                       15m
+                                       3w
+                                       1d )
+                   IN NS altsrv2.test.dom.
+altsrv2            IN A  192.168.100.252
+altwks1            IN A  192.168.100.250
+astra2             IN A  192.168.100.242
+'
+
+#check and next
+cat > /var/lib/bind/zone/arpa.office.test.dom.zone <<<'$TTL 1D
+@                  IN SOA office.test.dom. root.office.test.dom. (
+;                                       2024060101 10800 1800 3600000 259200
+                                        2024061802      ; serial
+                                        1D              ; refresh
+                                        1H              ; retry
+                                        1W              ; expire
+                                        3H              ; minimum
+                                        )
+                   IN NS    altsrv2.test.dom.
+252                IN PTR   altsrv2.test.dom.
+250                IN PTR   altwks1.office.test.dom.
+242                IN PTR   astra2.office.test.dom.
+'
+___________________________________________________________________________
+add domain description in local.conf file
+nano /var/lib/bind/etc/local.conf 
+
+add these strings:
+//
+// My office.test.dom MASTER Zones
+//
+zone "office.test.dom" IN {
+        type master;
+//        notify yes;
+//        also-notify { 192.168.100.252; };
+        allow-transfer { localhost; };
+        file "office.test.dom.zone";
+//        dnssec-policy default;
+};
+//
+// Reverse TESTLAB:
+//
+zone "100.168.192.in-addr.arpa" IN {
+        type master;
+        notify yes;
+//        also-notify { 192.168.100.252; };
+        allow-transfer { localhost; };
+        file "arpa.office.test.dom.zone";
+//        dnssec-policy default;
+};
+
+___________________________________________________________________________
+named-checkzone test.dom. /var/lib/bind/zone/test.dom.zone
+systemctl restart bind
+systemctl status bind
+___________________________________________________________________________
+rename hostnames altwks1 and astra2 <<== office.test.dom
+hostnamectl altwks1.office.test.dom
+hostnamectl astra2.office.test.dom
+___________________________________________________________________________
+
+
+
+
+___________________________________________________________________________
+___________________________________________________________________________
+___________________________________________________________________________
+Создание зоны DNS в изменяемом каталоге:
+# ps aux | grep named
+named 37252 0.0 /usr/sbin/named 4.4 108508 21704 ? Ssl 15:51 0:00
+___________________________________________________________________________
+# mkdir /var/lib/bind/zone/ddns
+# chown named:named /var/lib/bind/zone/ddns
+ls -ld /var/lib/bind/zone/ddns
+drwxr-xr-x 2 named named 4096 июн 22 16:01 /var/lib/bind/zone/ddns
+___________________________________________________________________________
+# cd /var/lib/bind
+# mv etc/company.ru zones/ddns
+# chown named:named /var/lib/bind/zone/ddns/company.ru
+___________________________________________________________________________
+Создание ключа для обновления зоны DNS:
+___________________________________________________________________________
+# cd /var/lib/bind
+# tsig-keygen -a HMAC-SHA512 ddns-key > etc/ddns.key
+# cat etc/ddns.key
+key "ddns-key" {
+algorithm hmac-sha512;
+secret "9gvNU . . . Obcyw==";
+};
+___________________________________________________________________________
+Разрешение обновления зоны DNS:
+___________________________________________________________________________
+# cat /var/lib/bind/etc/local.conf
+. . .
+include "/etc/bind/ddns.key";
+zone "company.ru" {
+type master;
+ООО «Базальт СПО»
+Москва, 2023 г.Курс: ALTSERV. Инфраструктурные службы ОС Альт.
+стр. 34/121
+file "ddns/company.ru.zone";
+allow-update { key ddns-key; };
+};
+. . .
+___________________________________________________________________________
+# named-checkconf -p
+. . .
+___________________________________________________________________________
+Дополнительно. Политики обновления
+• allow-update
+___________________________________________________________________________
+• update-policy
+___________________________________________________________________________
+• Пример описания политики
+zone "domain.ru" {
+type master;
+file "ddns/domain.ru.zone";
+update-policy {
+grant ddns-key wildcard *.domain.ru. ANY;
+grant ddns-key name domain.ru ANY;
+};
+};
+___________________________________________________________________________
+• grant
+___________________________________________________________________________
+• wildcard
+___________________________________________________________________________
+• Dynamic Update Policies
+Добавление ключа обновления зоны в конфигурацию DHCP
+# cp /var/lib/bind/etc/ddns.key /etc/dhcp/
+___________________________________________________________________________
+# cat /etc/dhcp/dhcpd.conf
+ddns-updates on;
+ddns-update-style interim;
+include "/etc/dhcp/ddns.key";
+zone company.ru. {
+primary 192.168.50.11;
+key ddns-key;
+}
+. . .
+___________________________________________________________________________
+update-static-leases on;
+___________________________________________________________________________
+Просмотр динамически обновляемой зоны
+• jnl-файлы
+___________________________________________________________________________
+# dig @server domain AXFR
+___________________________________________________________________________
+• TXT (interim) / DHCPID (standard)
+___________________________________________________________________________
+DDNS для reverse-зон
+# cat /etc/dhcp/dhcpd.conf
+. . .
+zone 50.168.192.in-addr.arpa. {
+primary 192.168.50.11;
+key ddns-key;
+}
+. . .
+___________________________________________________________________________
+Внесение изменений в динамическую зону
+• nsupdate
+___________________________________________________________________________
+$ nsupdate -k key
+___________________________________________________________________________
+• Основые команды nsupdate
+Команда           Описание
+server            Указание сервера, с динамической зоной
+zone              Указание динамической зоны
+update add        Добавление записей
+update delete     Удаление записей
+show              Отображение отправляемых изменений на сервер
+send              Отправка команд на сервер
+quit              Завершение работы с утилитой
+___________________________________________________________________________
+$ nsupdate -k nsupdate.key
+server 127.0.0.1
+zone domain.ru
+update add host1.domain.ru. 19200 IN A 192.168.0.1
+update add syn.domain.ru. 19200 IN CNAME host1.domain.ru.
+show
+. . .
+send
+quit
+___________________________________________________________________________
+# nsupdate -k nsupdate.key
+server 127.0.0.1
+zone domain.ru
+update delete syn.domain.ru. 19200 IN CNAME host1.domain.ru.
+update delete host1.domain.ru. 19200 IN A 192.168.0.1
+send
+quit
+
+___________________________________________________________________________________________________
+___________________________________________________________________________________________________
+ООО «Базальт СПО»
+Москва, 2023 г.Курс: ALTSERV. Инфраструктурные службы ОС Альт.
+___________________________________________________________________________________________________
+___________________________________________________________________________________________________
+
