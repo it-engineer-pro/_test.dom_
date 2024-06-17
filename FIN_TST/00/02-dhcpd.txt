@@ -36,7 +36,7 @@ RGST_PRTS="1024:49151"                   # Registered, privileged port range.
 DYNC_PRTS="49152:65535"                  # Dynamic, unprivileged port range.
 UNPR_PRTS="1024:65535"                   # Unprivileged port range.
 # SRV_IF -- change it accordingly with conditions.
-SRV_IF="enp19"                           # Internal interface.
+SRV_IF="enp0s10"                         # Internal interface.
 # SRV_IP, SRV_IPs -- change it accordingly with conditions, but for documents only,
 # hense script not use server IP in chains.
 SRV_IP="192.168.100.251/24"              # Internal Interface IP address.
@@ -213,28 +213,34 @@ $IPT -A _LIMIT_CTRL_ -j RETURN
 ########################################################################
 #
 $IPT -A FORWARD -p udp -s 0.0.0.0 -j _DHCPD_SERVICE_
-$IPT -A INPUT -i $SRV_IF -p udp —dport 67 -j _DHCPD_SERVICE_
-$IPT -A OUTPUT -o $SRV_IF -p udp —sport 67 -j _DHCPD_SERVICE_
+$IPT -A INPUT -i $SRV_IF -p udp --dport 67 -j _DHCPD_SERVICE_
+$IPT -A OUTPUT -o $SRV_IF -p udp --sport 67 -j _DHCPD_SERVICE_
 #
 # DHCPd packets logging first:
                                 #_-s0.0.0.0-udp67-fw_log_
-$IPT -A _DHCPD_SERVICE_ -p udp -s $BCST_SRC -d $BCST_DEST --sport 68 --dport 67 --ctstate NEW -j LOG --log-prefix "IPT_DHCP_pkts_flow: "
+$IPT -A _DHCPD_SERVICE_ -p udp -s $BCST_SRC -d $BCST_DEST --sport 68 --dport 67  \
+                        -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DHCP_pkts_flow: "
 
                                 #_0.0.0.0-udp67-in_log_
-$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p udp --sport 67 --dport 67 --ctstate NEW -j LOG --log-prefix "IPT_DHCP_pkts_flow: "
+$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p udp --sport 67 --dport 67 \
+                        -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DHCP_pkts_flow: "
 
                                 #_-udp67-out_log_
-$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p udp --sport 67 --dport 68 --ctstate NEW -j LOG --log-prefix "IPT_DHCP_pkts_flow: "
+$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p udp --sport 67 --dport 68  \
+                        -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DHCP_pkts_flow: "
 #
 # DHCPd packets Accepting Then:
                                 #_-s0.0.0.0-udp67-fw_logaccept_
-$IPT -A _DHCPD_SERVICE_ -p udp -s $BCST_SRC -d $BCST_DEST --sport 68 --dport 67 --ctstate NEW -j _LOG_ACCEPT_
+$IPT -A _DHCPD_SERVICE_ -p udp -s $BCST_SRC -d $BCST_DEST --sport 68 --dport 67 \
+                        -m conntrack --ctstate NEW -j _LOG_ACCEPT_
 
                                 #_0.0.0.0-udp67-in_logaccept_
-$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p udp --sport 67 --dport 67 --ctstate NEW -j _LOG_ACCEPT_
+$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p udp --sport 67 --dport 67 \
+                        -m conntrack --ctstate NEW -j _LOG_ACCEPT_
 
                                 #_-udp67-out_logaccept_
-$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p udp --sport 67 --dport 68 --ctstate NEW -j _LOG_ACCEPT_
+$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p udp --sport 67 --dport 68 \
+                        -m conntrack --ctstate NEW -j _LOG_ACCEPT_
 #
 # RETURN Broadcasts to TCP Flow, to other chain or to _LOG_FILTER_
 $IPT -A _DHCPD_SERVICE_ -j RETURN
