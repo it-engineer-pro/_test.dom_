@@ -1,0 +1,35 @@
+DNS RESOLUTION testing/cheking tools:
+
+$ dig www.altlinux.org
+$ dig altlinux.org NS
+$ dig @8.8.8.8 www.altlinux.org
+$ dig @127.0.0.1 server.internat.domain.net
+$ dig altlinux.org NS +short
+$ dig altlinux.org ANY +noall +answer
+dig AXFR it-engineer.lan @watcher
+!$ dig @192.168.100.251 test.dom AXFR
+
+# cat etc/bind/options.conf
+options {
+. . .
+allow-transfer { localhost; 192.168.50.12; };
+};
+
+host
+$ host [-v] [-t type] name [server]
+$ man host
+$ host www.altlinux.org
+$ host -t NS altlinux.org 8.8.8.8
+
+nslookup
+$ nslookup [-option] [name | -] [server]
+$ man nslookup
+$ nslookup - 127.0.0.1
+> server.internal.domain.net
+> set type=ns
+> internal.domain.net
+> exit
+
+delv
+$ delv [@server] [options] [name] [type]
+$ man delv

@@ -1,0 +1,480 @@
+#!/bin/bash
+########################################################################
+# iptables rules for some quick setups
+# no parameterization, no if or while choise, but simple push into CLI
+# and see that it works.
+########################################################################
+# don't use FORWARD chain thro it's not router, but simple server is.
+# access described only for test.dom subnetwork.
+########################################################################
+# rules optimized for simplicity and integrality
+# _LAN_IF_ == enp0s10 here
+# -s/-d == 192.168.100.0/24
+# 06.2024.
+########################################################################
+#
+# Aliaces and shortcuts
+# ===================
+IPT="/sbin/iptables"                     # Location of iptables on your system.
+#LPB_IF="lo"                             # Local Network Interface. Not Acceptable Now.
+                                         # Use lo ! insteed
+#
+LPB_SN="127.0.0.0/8"                     # Reserved loopback address range.
+CLS_A="10.0.0.0/8"                       # Class A private networks.
+CLS_B="172.16.0.0/12"                    # Class B private networks.
+CLS_C="192.168.0.0/16"                   # Class C private networks.
+CLS_D_MLTCST="224.0.0.0/4"               # Class D multicast addresses.
+CLS_E_RESNET="240.0.0.0/5"               # Class E reserved addresses.
+BCST_SRC_NET="0.0.0.0/8"                 # Can't be blocked unilaterally with DHCP.
+LINK_LCL="169.254.0.0/16"                # Link Local Network.
+TEST_NET="192.0.2.0/24"                  # TEST-NET.
+BCST_SRC="0.0.0.0"                       # Broadcast source address.
+BCST_DEST="255.255.255.255"              # Broadcast destination address.
+WTCP_PRTS="1:1023"                       # Well-known, privileged port range. TCP.
+WUDP_PRTS="0:1023"                       # Well-known, privileged port range. UDP.
+RGST_PRTS="1024:49151"                   # Registered, privileged port range.
+DYNC_PRTS="49152:65535"                  # Dynamic, unprivileged port range.
+UNPR_PRTS="1024:65535"                   # Unprivileged port range.
+# SRV_IF -- change it accordingly with conditions.
+SRV_IF="ens19"                           # Internal interface.
+# SRV_IP, SRV_IPs -- change it accordingly with conditions, but for documents only,
+# hense script not use server IP in chains.
+SRV_IP="192.168.100.251/24"              # Internal Interface IP address.
+SRV_IPs="192.168.100.251"                # Internal Interface IP address/NoSN.
+# SRV_SN -- change it accordingly with conditions.
+SRV_SN="192.168.100.0/24"                # Internal Subnet.
+SRV_BR="192.168.100.255/24"              # Internal Subnet Broadcast.
+#
+# traceroute usually uses -S 32769:65535 -D 33434:33523
+TRCRT_SRC_PORTS="32769:65535"            # Traceroute source ports.
+TRCRT_DST_PORTS="33434:33523"            # Traceroute destination ports.
+#
+NS1="192.168.100.253"                    # Address of a local name server.
+NTP="192.168.100.253"                    # Address of a remote time server.
+SSH_CLI1="192.168.100.253"               # Remote Support IP address.
+SSH_LCLP="22"                            # _LOCAL_SSHD_ port for remote
+                                         # support access.
+SRV_TCP_IN_PORTS="22,8080,53"            # Local Serviced Port TCP
+SRV_UDP_IN_PORTS="53,123"                # Local Serviced Port TCP
+                                         #
+SRV_TCP_ALLOWOUT="22,80,443,53"          # Local Serviced Port TCP
+SRV_UDP_ALLOWOUT="53,123"                # Local Serviced Port TCP
+########################################################################
+# Default Policy Drop
+# ===================
+$IPT -P INPUT DROP
+$IPT -P FORWARD DROP
+$IPT -P OUTPUT DROP
+########################################################################
+# LocalHost Allow
+# ===================
+$IPT -A INPUT -i lo -j ACCEPT
+$IPT -A OUTPUT -o lo -j ACCEPT
+#
+# Allow Est/Rel INPUT/OUTPUT
+# ===================
+#IN
+$IPT -t filter -A INPUT -p tcp -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+$IPT -t filter -A INPUT -p udp -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+$IPT -t filter -A INPUT -p icmp -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+#OUT
+$IPT -t filter -A OUTPUT -p tcp -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+$IPT -t filter -A OUTPUT -p udp -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+$IPT -t filter -A OUTPUT -p icmp -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+########################################################################
+# Describe and Define Custom Chains:
+# ===================
+# _BAD_TCP_ CHAIN in MANGLE  -- cleaning input traffic chain
+# _LOG_DROP_ -- log and drop in mangle
+# _LOG_FILTER_ -- log and drop in filter
+# _LOG_ACCEPT_ -- log and accept chain
+# _PORT_SCAN_ -- block nmap and forget them
+# _RESET_CTRL_ -- cleaning reset storm
+# _LIMIT_CTRL_ -- limit connections from one address
+# _DHCPD_SERVICE_ -- control local DHCPd enviroment
+# _DNS_SERVICE_   -- control local DNS enviroment
+# _INPUT_TCP_LAN_IF_ -- control input tcp
+# _INPUT_UDP_LAN_IF_ -- control input udp
+# _OUTPUT_TCP_LAN_IF_ -- control output tcp
+# _OUTPUT_UDP_LAN_IF_ -- control output udp
+# _INPUT_ICMP_LAN_IF_ -- control input icmp
+# _OUTPUT_ICMP_LAN_IF_ -- control output icmp
+########################################################################
+$IPT -t mangle -N _BAD_TCP_
+$IPT -t mangle -N _LOG_DROP_
+$IPT -t filter -N _PORT_SCAN_
+$IPT -t filter -N _RESET_CTRL_
+$IPT -t filter -N _LIMIT_CTRL_
+$IPT -t filter -N _LOG_FILTER_
+$IPT -t filter -N _LOG_ACCEPT_
+$IPT -t filter -N _DHCPD_SERVICE_
+$IPT -t filter -N _DNS_SERVICE_
+$IPT -t filter -N _INPUT_TCP_LAN_IF_
+$IPT -t filter -N _INPUT_UDP_LAN_IF_
+$IPT -t filter -N _INPUT_ICMP_LAN_IF_
+$IPT -t filter -N _OUTPUT_TCP_LAN_IF_
+$IPT -t filter -N _OUTPUT_UDP_LAN_IF_
+$IPT -t filter -N _OUTPUT_ICMP_LAN_IF_
+
+########################################################################
+# Define custom chains _LOG_DROP_ / _LOG_FILTER_ / _LOG_ACCEPT_
+# for log dropped or accepted packets.
+# ===================
+########################################################################
+#
+# Rules for log and drop packets in early access in mangle:
+$IPT -t mangle -A _LOG_DROP_ -m limit --limit 1/min --limit-burst 10 -j LOG --log-prefix "IPT_LogDropInMangle: " --log-level 4
+$IPT -t mangle -A _LOG_DROP_ -j DROP
+#
+# Rules for log and drop packets in usual access in filter:
+$IPT -t filter -A _LOG_FILTER_ -m limit --limit 1/min --limit-burst 10 -j LOG --log-prefix "IPT_LogDropInFilter: " --log-level 4
+$IPT -t filter -A _LOG_FILTER_ -j DROP
+#
+# Rules for log and pass packets in ACCEPT filter rules in TCP/UDP/ICMP chains down in this script:
+$IPT -t filter -A _LOG_ACCEPT_ -m limit --limit 600/min --limit-burst 100 -j LOG --log-prefix "IPT_LogAcceptInFilter: " --log-level 4
+$IPT -t filter -A _LOG_ACCEPT_ -j ACCEPT
+#
+########################################################################
+# _BAD_TCP_ -- Local CleanUp fot PREROUTING Chain in Mangle Table:
+# ===================
+########################################################################
+$IPT -t mangle -A PREROUTING -p tcp -j _BAD_TCP_
+# Drop Invalid Packets
+$IPT -t mangle -A _BAD_TCP_ -m conntrack --ctstate INVALID -j _LOG_DROP_
+# Drop NEW without --syn
+$IPT -t mangle -A _BAD_TCP_ -p tcp ! --syn -m conntrack --ctstate NEW -j _LOG_DROP_
+# Drop Packets with wrong MMS states
+$IPT -t mangle -A _BAD_TCP_ -p tcp -m conntrack --ctstate NEW -m tcpmss ! --mss 536:65535 -j _LOG_DROP_
+# Drop Packets with wrong TCP-flags
+$IPT -t mangle -A _BAD_TCP_ -p tcp -m tcp ! --tcp-flags FIN,SYN,RST,ACK SYN -m state --state NEW -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -m limit --limit 1/sec --limit-burst 3
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags FIN,SYN,RST,PSH,ACK,URG NONE -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags FIN,SYN FIN,SYN -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags SYN,RST SYN,RST -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags SYN,FIN SYN,FIN -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags FIN,RST FIN,RST -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags FIN,ACK FIN -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags ACK,URG URG -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags ACK,FIN FIN -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags ACK,PSH PSH -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags ALL ALL -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags ALL NONE -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags ALL FIN,PSH,URG -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags ALL SYN,FIN,PSH,URG -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -p tcp --tcp-flags ALL SYN,RST,ACK,FIN,URG -j _LOG_DROP_
+# Drop spoofing and any service ranges
+# Adjust it accordingly you conditions.
+#$IPT -t mangle -A _BAD_TCP_ -s 192.168.0.0/16 -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -s 172.16.0.0/12 -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -s 10.0.0.0/8 -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -s 224.0.0.0/3 -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -s 169.254.0.0/16 -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -s 192.0.2.0/24 -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -s 0.0.0.0/8 -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -s 240.0.0.0/5 -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -s 127.0.0.0/8 ! -i lo -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -f -j _LOG_DROP_
+# uncomment this rule for block ICMP finally, if you not use it
+#$IPT -t mangle -A _BAD_TCP_ -p icmp -j _LOG_DROP_
+$IPT -t mangle -A _BAD_TCP_ -j RETURN
+
+########################################################################
+# Port Scan Protection Rules. (_Use it with careful_.):
+# ===================
+########################################################################
+#$IPT -t filter -A INPUT -p tcp -j _PORT_SCAN_
+#$IPT -A _PORT_SCAN_ -m recent --name portscan --rcheck --seconds 900 -j DROP
+#$IPT -A _PORT_SCAN_ -m recent --name portscan --remove
+#$IPT -A _PORT_SCAN_ -p tcp -m tcp --dport 8080 -m recent --name portscan --set -j LOG --log-prefix "IPT_portscan: "
+#$IPT -A _PORT_SCAN_ -p tcp -m tcp --dport 8080 -m recent --name portscan --set -j DROP
+#$IPT -A _PORT_SCAN_ -j RETURN
+
+########################################################################
+# TCP Flow Control Rules: "--limit" can only be used once
+# ===================
+########################################################################
+# control reset storm
+# _RESET_CTRL_
+#$IPT -A INPUT -p tcp -j _RESET_CTRL_
+#$IPT -A _RESET_CTRL_ -p tcp --tcp-flags RST RST -m limit --limit 2/s --limit=burst 2 -j ACCEPT
+#$IPT -A _RESET_CTRL_ -p tcp --tcp-flags RST RST -j _LOG_FILTER_
+#$IPT -A _RESET_CTRL_ -j RETURN
+# limit ip-connections number from one address
+# _LIMIT_CTRL_
+$IPT -A INPUT -p tcp -j _LIMIT_CTRL_
+$IPT -A _LIMIT_CTRL_ -p tcp -m connlimit --connlimit-above 600 -j REJECT --reject-with tcp-reset
+# limit tcp-connections number from one address
+#$IPT -A _LIMIT_CTRL_ -p tcp -m conntrack --ctstate NEW -m limit --limit 600/s --limit-burst 60 -j ACCEPT
+#$IPT -A _LIMIT_CTRL_ -p tcp -m conntrack --ctstate NEW -j _LOG_FILTER_
+$IPT -A _LIMIT_CTRL_ -j RETURN
+
+#
+########################################################################
+# _DHCPD_SERVICE_ -- Local DHCPd packets flow:
+# ===================
+########################################################################
+#
+$IPT -A FORWARD -p udp -s 0.0.0.0 -j _DHCPD_SERVICE_
+$IPT -A INPUT -i $SRV_IF -p udp --dport 67 -j _DHCPD_SERVICE_
+$IPT -A OUTPUT -o $SRV_IF -p udp --sport 67 -j _DHCPD_SERVICE_
+$IPT -A INPUT -i $SRV_IF -p tcp --dport 519:520 -j _DHCPD_SERVICE_
+$IPT -A OUTPUT -o $SRV_IF -p tcp --dport 519:520 -j _DHCPD_SERVICE_
+#
+# DHCPd packets logging first:
+                                #_-s0.0.0.0-udp67-fw_log_
+$IPT -A _DHCPD_SERVICE_ -p udp -s $BCST_SRC -d $BCST_DEST --sport 68 --dport 67  \
+                        -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DHCP_pkts_flow: "
+
+                                #_0.0.0.0-udp67-in_log_
+$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p udp --sport 67 --dport 67 \
+                        -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DHCP_pkts_flow: "
+
+                                #_-udp67-out_log_
+$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p udp --sport 67 --dport 68  \
+                        -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DHCP_pkts_flow: "
+#
+# DHCPd packets Accepting Then:
+                                #_-s0.0.0.0-udp67-fw_accept_
+$IPT -A _DHCPD_SERVICE_ -p udp -s $BCST_SRC -d $BCST_DEST --sport 68 --dport 67 \
+                        -m conntrack --ctstate NEW -j ACCEPT
+
+                                #_0.0.0.0-udp67-in_accept_
+$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p udp --sport 67 --dport 67 \
+                        -m conntrack --ctstate NEW -j ACCEPT
+
+                                #_-udp67-out_accept_
+$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p udp --sport 67 --dport 68 \
+                        -m conntrack --ctstate NEW -j ACCEPT
+
+#
+# DHCPd Failover packets logging:
+                                #_-tcp519:520-in_log_
+$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p tcp --sport $UNPR_PRTS --dport 519:520 \
+                        --syn -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DHCP_failover: "
+
+                                #_-tcp519:520-out_log_
+$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p tcp --sport $UNPR_PRTS --dport 519:520 \
+                        --syn -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DHCP_failover: "
+
+                                #_-tcp519:520-in_accept_
+$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p tcp --sport $UNPR_PRTS --dport 519:520 \
+                        --syn -m conntrack --ctstate NEW -j ACCEPT
+
+                                #_-tcp519:520-out_accept_
+$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p tcp --sport $UNPR_PRTS --dport 519:520 \
+                        --syn -m conntrack --ctstate NEW -j ACCEPT
+
+#
+# RETURN Broadcasts to TCP Flow, to other chain or to _LOG_FILTER_
+$IPT -A _DHCPD_SERVICE_ -j RETURN
+
+#
+########################################################################
+# _DNS_SERVICE_ -- Local DNS packets flow:
+# ===================
+########################################################################
+#
+$IPT -A INPUT -i $SRV_IF -p tcp --dport 53 -j _DNS_SERVICE_
+$IPT -A OUTPUT -o $SRV_IF -p tcp --dport 53 -j _DNS_SERVICE_
+$IPT -A INPUT -i $SRV_IF -p udp --dport 53 -j _DNS_SERVICE_
+$IPT -A OUTPUT -o $SRV_IF -p udp --dport 53 -j _DNS_SERVICE_
+#
+# DNS Server packets logging:
+                                #_-tcp53-in_log_
+$IPT -A _DNS_SERVICE_ -i $SRV_IF -p tcp --sport $UNPR_PRTS --dport 53 \
+                        --syn -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DNS_AXFR-in: "
+
+                                #_-tcp53-out_log_
+$IPT -A _DNS_SERVICE_ -o $SRV_IF -p tcp --sport $UNPR_PRTS --dport 53 \
+                        --syn -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DNS_AXFR-out: "
+
+                                #_-udp53-in_log_
+$IPT -A _DNS_SERVICE_ -i $SRV_IF -p udp --sport $UNPR_PRTS --dport 53 \
+                        -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DNS_Queries-in: "
+
+                                #_-udp53-unbound-out_log_
+$IPT -A _DNS_SERVICE_ -o $SRV_IF -p udp --sport $UNPR_PRTS -d 192.168.100.253 --dport 53 \
+                        -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DNS_Queries-Unbound-out: "
+
+                                #_-udp53-out_log_
+$IPT -A _DNS_SERVICE_ -o $SRV_IF -p udp --sport $UNPR_PRTS --dport 53 \
+                        -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DNS_Queries-out: "
+
+# DNS Server packets accepting:
+                                #_-tcp53-in_accept_
+$IPT -A _DNS_SERVICE_ -i $SRV_IF -p tcp --sport $UNPR_PRTS --dport 53 \
+                        --syn -m conntrack --ctstate NEW -j ACCEPT
+
+                                #_-tcp53-out_accept_
+$IPT -A _DNS_SERVICE_ -o $SRV_IF -p tcp --sport $UNPR_PRTS --dport 53 \
+                        --syn -m conntrack --ctstate NEW -j ACCEPT
+
+                                #_-udp53-in_accept_
+$IPT -A _DNS_SERVICE_ -i $SRV_IF -p udp --sport $UNPR_PRTS --dport 53 \
+                        -m conntrack --ctstate NEW -j ACCEPT
+
+                                #_-udp53-unbound-out_accept_
+$IPT -A _DNS_SERVICE_ -o $SRV_IF -p udp --sport $UNPR_PRTS -d 192.168.100.253 --dport 53 \
+                        -m conntrack --ctstate NEW -j ACCEPT
+
+                                #_-udp53-out_accept_
+$IPT -A _DNS_SERVICE_ -o $SRV_IF -p udp --sport $UNPR_PRTS --dport 53 \
+                        -m conntrack --ctstate NEW -j ACCEPT
+
+#
+# Return back, another chain or logfilter
+$IPT -A _DNS_SERVICE_ -j RETURN
+
+########################################################################
+# enp0s10 -- internal server interface with it's services
+# in this scenario we assume that we serve only one our subnetwork
+# (192.168.100.0/24 -- change it when other numbers)
+# ===================
+########################################################################
+$IPT -A INPUT -p tcp -j _INPUT_TCP_LAN_IF_
+$IPT -A INPUT -p udp -j _INPUT_UDP_LAN_IF_
+########################################################################
+$IPT -A OUTPUT -p tcp -j _OUTPUT_TCP_LAN_IF_
+$IPT -A OUTPUT -p udp -j _OUTPUT_UDP_LAN_IF_
+########################################################################
+$IPT -A INPUT -p icmp -j _INPUT_ICMP_LAN_IF_
+$IPT -A OUTPUT -p icmp -j _OUTPUT_ICMP_LAN_IF_
+########################################################################
+
+########################################################################
+########################################################################
+# Add or delete/remark rules for adoption for test scenario, in next blocks.
+# TCP ALLOW IN _FLOW_: (with --syn + NEW):
+# ===================
+########################################################################
+########################################################################
+# Management Access Rule1:
+                                #_TCP SSH IN_
+$IPT -A _INPUT_TCP_LAN_IF_ -p tcp -i $SRV_IF -s $SRV_SN \
+                                     --sport $UNPR_PRTS --dport 22 \
+                                     --syn -m conntrack --ctstate NEW -j _LOG_ACCEPT_
+# Management Access Rule2:
+                                #_TCP WEB-CONSOLE IN_
+$IPT -A _INPUT_TCP_LAN_IF_ -p tcp -i $SRV_IF -s $SRV_SN \
+                                     --sport $UNPR_PRTS --dport 8080 \
+                                     --syn -m conntrack --ctstate NEW -j _LOG_ACCEPT_
+#
+# all other tcp in drop with log
+$IPT -A _INPUT_TCP_LAN_IF_ -j _LOG_FILTER_
+########################################################################
+########################################################################
+# UDP ALLOW IN _FLOW_:
+# ===================
+########################################################################
+########################################################################
+
+                                #_NTP/UDP IN_
+$IPT -A _INPUT_UDP_LAN_IF_ -p udp -i $SRV_IF -s $SRV_SN \
+                                     --sport $UNPR_PRTS --dport 123 \
+                                     -m conntrack --ctstate NEW -j _LOG_ACCEPT_
+
+                                #_NTP/UDP IN_
+$IPT -A _INPUT_UDP_LAN_IF_ -p udp -i $SRV_IF -s $SRV_SN \
+                                     --sport $UNPR_PRTS --dport 53 \
+                                     -m conntrack --ctstate NEW -j _LOG_ACCEPT_
+#
+# all other udp in drop with log
+$IPT -A _INPUT_UDP_LAN_IF_ -j _LOG_FILTER_
+########################################################################
+########################################################################
+# TCP ALLOW OUT _FLOW_ with (--syn + NEW):
+# ===================
+########################################################################
+########################################################################
+
+                                #_TCP SSH OUT_
+$IPT -A _OUTPUT_TCP_LAN_IF_ -p tcp -o $SRV_IF --sport $UNPR_PRTS --dport 22 \
+                                --syn -m conntrack --ctstate NEW -j _LOG_ACCEPT_
+
+                                #_WEB noSSL OUT_
+$IPT -A _OUTPUT_TCP_LAN_IF_ -p tcp -o $SRV_IF --sport $UNPR_PRTS --dport 80 \
+                                --syn -m conntrack --ctstate NEW -j _LOG_ACCEPT_
+
+                                #_TCP SSL OUT_
+$IPT -A _OUTPUT_TCP_LAN_IF_ -p tcp -o $SRV_IF --sport $UNPR_PRTS --dport 443 \
+                                --syn -m conntrack --ctstate NEW -j _LOG_ACCEPT_
+
+# all other tcp out drop with log
+$IPT -A _OUTPUT_TCP_LAN_IF_ -j _LOG_FILTER_
+#
+########################################################################
+########################################################################
+# UDP ALLOW OUT _FLOW_:
+# ===================
+########################################################################
+########################################################################
+
+                                #_DNS/UDP OUT_
+$IPT -A _OUTPUT_UDP_LAN_IF_ -p udp --sport $UNPR_PRTS --dport 53 \
+                                      -m conntrack --ctstate NEW -j _LOG_ACCEPT_
+
+                                #_NTP/UDP OUT_
+$IPT -A _OUTPUT_UDP_LAN_IF_ -p udp --sport $UNPR_PRTS --dport 123 \
+                                      -m conntrack --ctstate NEW -j _LOG_ACCEPT_
+
+# all other udp out drop with log
+$IPT -A _OUTPUT_UDP_LAN_IF_ -j _LOG_FILTER_
+#
+########################################################################
+
+########################################################################
+########################################################################
+# ICMP CONTROL:
+# ===================
+########################################################################
+########################################################################
+# INPUT ICMP _FLOW_ :
+# ===================
+# requests to me from my subnetwork:
+$IPT -A _INPUT_ICMP_LAN_IF_ -p icmp -i $SRV_IF -s $SRV_SN --icmp-type echo-request -j _LOG_ACCEPT_
+# answers for me from my subnetwork:
+$IPT -A _INPUT_ICMP_LAN_IF_ -p icmp -i $SRV_IF -s $SRV_SN --icmp-type echo-reply -j _LOG_ACCEPT_
+$IPT -A _INPUT_ICMP_LAN_IF_ -p icmp -i $SRV_IF -s $SRV_SN --icmp-type time-exceeded -j _LOG_ACCEPT_
+$IPT -A _INPUT_ICMP_LAN_IF_ -p icmp -i $SRV_IF -s $SRV_SN --icmp-type fragmentation-needed -j _LOG_ACCEPT_
+# answers for me from others:
+$IPT -A _INPUT_ICMP_LAN_IF_ -p icmp -i $SRV_IF --icmp-type echo-reply -j _LOG_ACCEPT_
+$IPT -A _INPUT_ICMP_LAN_IF_ -p icmp -i $SRV_IF --icmp-type time-exceeded -j _LOG_ACCEPT_
+$IPT -A _INPUT_ICMP_LAN_IF_ -p icmp -i $SRV_IF --icmp-type fragmentation-needed -j _LOG_ACCEPT_
+# close chain:
+$IPT -A _INPUT_ICMP_LAN_IF_ -j _LOG_FILTER_
+###
+# OUPUT ICMP _FLOW_ :
+# ===================
+# ping to my subnetwork from me
+$IPT -A _OUTPUT_ICMP_LAN_IF_ -p icmp -o $SRV_IF -d $SRV_SN --icmp-type echo-request -j _LOG_ACCEPT_
+# ping to external hosts
+$IPT -A _OUTPUT_ICMP_LAN_IF_ -p icmp -o $SRV_IF -d 8.8.8.8 --icmp-type echo-request -j _LOG_ACCEPT_
+$IPT -A _OUTPUT_ICMP_LAN_IF_ -p icmp -o $SRV_IF -d 192.168.17.155 --icmp-type echo-request -j _LOG_ACCEPT_
+# icmp answers to my subnetwork
+$IPT -A _OUTPUT_ICMP_LAN_IF_ -p icmp -o $SRV_IF -d $SRV_SN --icmp-type echo-reply -j _LOG_ACCEPT_
+$IPT -A _OUTPUT_ICMP_LAN_IF_ -p icmp -o $SRV_IF -d $SRV_SN --icmp-type time-exceeded -j _LOG_ACCEPT_
+$IPT -A _OUTPUT_ICMP_LAN_IF_ -p icmp -o $SRV_IF -d $SRV_SN --icmp-type fragmentation-needed -j _LOG_ACCEPT_
+# close chain:
+$IPT -A _OUTPUT_ICMP_LAN_IF_ -j _LOG_FILTER_
+########################################################################
+# Setup steps:
+# apt-get install iptables
+# apt-get install conntrack-tools iptstate netstat-nat
+# mkdir /etc/sysconfig/_iptables
+# mkdir /root/backup
+# iptables-save | tee /root/backup/iptables-save-$(date +%d-%m-%y-%H:%M:%S:%Z)
+# cd /etc/sysconfig/_iptables
+# touch _iptables_run_.sh
+# save as _iptables_run_.sh
+# chmod +x _iptables_run_.sh
+# cat /etc/sysconfig/_iptables/_iptables_run_.sh <<<'...'
+# if all going rights run ./_iptables_run_.sh
+# iptables -nvL --line-numbers
+# journalctl -a | grep IPT
+# dmesg -k --follow OR cat /var/log/kern.log | grep 'IPT'
+# ... etc
+# before end and close work, remarl with
+# # unused or not agreed upon rules in sections with "_FLOW_" comments and reload scripts 1 and 3.
+# you may be dropped out if use SSH to connect to system, so make it locally
+# iptables-save > /etc/sysconfig/iptables << and restart service of system
+########################################################################

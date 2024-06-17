@@ -1,0 +1,50 @@
+SOME-QUIK-EDIT-TIPS in WorkRave.github
+
+Often in setup, debug, install or deploy sessions, we need change content of config
+quikly and in short delays. As is known Vim is the best choise in this routine, but not only.
+Here is some tricks for reset content of the file without its recreation.
+
+Simple echo usage:
+# echo "" > access.log
+# echo > access.log
+# echo -n "" > access.log <<-- '-n' mean NO NEW LINE
+
+OR:
+# # truncate -s 0 access.log
+
+OR:
+vim access.log
+Esc
+:dG
+:wq
+
+vim access.log
+Esc
+:1,$d
+:wq
+
+Document Here (DocHere>):
+cat > testlab.lan.zone
+Ctrl+Shift+V
+Ctrl+D
+
+OR use cat > with-file-name.sh <<<''
+cat > with-file-name.sh <<<'#!/bin/bash
+#
+#
+ls -la
+'
+
+Additionally, you can empty the contents of a file
+by redirecting the output of /dev/null to it (file)
+as input using the cat command:
+# cp access.log /root/backup/access.log
+# cat /dev/null > access.log
+OR:
+# cp /dev/null access.log
+# dd if=/dev/null of=access.log
+# du -sh access.log <<-- check how much space it use.
+
+https://www.tecmint.com/delete-all-text-in-a-file-using-vi-editor/
+https://www.tecmint.com/learn-vi-and-vim-editor-tips-and-tricks-in-linux/
+
