@@ -281,44 +281,44 @@ $IPT -A OUTPUT -o $SRV_IF -p udp --dport 53 -j _DNS_SERVICE_
 #
 # DNS Server packets logging:
                                 #_-tcp53-in_log_
-$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p tcp --sport $UNPR_PRTS --dport 53 \
+$IPT -A _DNS_SERVICE_ -i $SRV_IF -p tcp --sport $UNPR_PRTS --dport 53 \
                         --syn -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DNS_AXFR-in: "
 
                                 #_-tcp53-out_log_
-$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p tcp --sport $UNPR_PRTS --dport 53 \
+$IPT -A _DNS_SERVICE_ -o $SRV_IF -p tcp --sport $UNPR_PRTS --dport 53 \
                         --syn -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DNS_AXFR-out: "
 
                                 #_-udp53-in_log_
-$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p udp --sport $UNPR_PRTS --dport 53 \
+$IPT -A _DNS_SERVICE_ -i $SRV_IF -p udp --sport $UNPR_PRTS --dport 53 \
                         -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DNS_Queries-in: "
 
                                 #_-udp53-unbound-out_log_
-$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p udp --sport $UNPR_PRTS -d 192.168.100.253 --dport 53 \
+$IPT -A _DNS_SERVICE_ -o $SRV_IF -p udp --sport $UNPR_PRTS -d 192.168.100.253 --dport 53 \
                         -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DNS_Queries-Unbound-out: "
 
                                 #_-udp53-out_log_
-$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p udp --sport $UNPR_PRTS --dport 53 \
+$IPT -A _DNS_SERVICE_ -o $SRV_IF -p udp --sport $UNPR_PRTS --dport 53 \
                         -m conntrack --ctstate NEW -j LOG --log-prefix "IPT_DNS_Queries-out: "
 
 # DNS Server packets accepting:
                                 #_-tcp53-in_accept_
-$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p tcp --sport $UNPR_PRTS --dport 53 \
+$IPT -A _DNS_SERVICE_ -i $SRV_IF -p tcp --sport $UNPR_PRTS --dport 53 \
                         --syn -m conntrack --ctstate NEW -j ACCEPT
 
                                 #_-tcp53-out_accept_
-$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p tcp --sport $UNPR_PRTS --dport 53 \
+$IPT -A _DNS_SERVICE_ -o $SRV_IF -p tcp --sport $UNPR_PRTS --dport 53 \
                         --syn -m conntrack --ctstate NEW -j ACCEPT
 
                                 #_-udp53-in_accept_
-$IPT -A _DHCPD_SERVICE_ -i $SRV_IF -p udp --sport $UNPR_PRTS --dport 53 \
-                        -m conntrack --ctstate NEW -j LOG ACCEPT
+$IPT -A _DNS_SERVICE_ -i $SRV_IF -p udp --sport $UNPR_PRTS --dport 53 \
+                        -m conntrack --ctstate NEW -j ACCEPT
 
                                 #_-udp53-unbound-out_accept_
-$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p udp --sport $UNPR_PRTS -d 192.168.100.253 --dport 53 \
+$IPT -A _DNS_SERVICE_ -o $SRV_IF -p udp --sport $UNPR_PRTS -d 192.168.100.253 --dport 53 \
                         -m conntrack --ctstate NEW -j ACCEPT
 
                                 #_-udp53-out_accept_
-$IPT -A _DHCPD_SERVICE_ -o $SRV_IF -p udp --sport $UNPR_PRTS --dport 53 \
+$IPT -A _DNS_SERVICE_ -o $SRV_IF -p udp --sport $UNPR_PRTS --dport 53 \
                         -m conntrack --ctstate NEW -j ACCEPT
 
 #

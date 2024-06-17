@@ -6,7 +6,8 @@ $ dig @8.8.8.8 www.altlinux.org
 $ dig @127.0.0.1 server.internat.domain.net
 $ dig altlinux.org NS +short
 $ dig altlinux.org ANY +noall +answer
-!$ dig @192.168.50.11 company.ru AXFR
+dig AXFR it-engineer.lan @watcher
+!$ dig @192.168.100.251 test.dom AXFR
 
 # cat etc/bind/options.conf
 options {
