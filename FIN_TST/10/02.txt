@@ -59,7 +59,15 @@ server (via forwarders { 192.168.100.253; };), or use 8.8.8.8 or local trusted f
 SLAVE:
 0. Create and write slave forward and reverse zones in /var/lib/bind/etc/local.conf.
 1. Create zone files on master server.
-
+2. Enable ACL, enable logging on slave.
+3. Enable 'control bind-slave enable'.
+4. Make zone update and check transfer.
+5. Control operations via log files.
+6. Conrol operations with zone transfer from replication partners.
+7. Check zone transfers from internal hosts (altsrv3,altwks1,astra1,astra3)
+8. Check zone transfers attempts in logs.
+9. ... create subdomain OFFICE.TEST.DOM for DDNS operations on SLAVE.
+10. Check rndc-control channel.
 ---------------------------------------------------------------------------------------------------------------------
 # Make backup for our operational files:
 mkdir /root/backup/
@@ -93,33 +101,37 @@ include "/etc/bind/rfc1912.conf";
 // Add other zones here
 
 //
-// My test.dom MASTER Zones
+// My test.dom SLAVE Zones
 //
 zone "test.dom" IN {
-        type master;
-        notify yes;
-        also-notify { 192.168.100.252; };
-        allow-transfer { localhost; 192.168.100.252; };
-        file "test.dom.zone";
+        type slave;
+//        notify yes;
+//        also-notify { 192.168.100.252; };
+//        allow-transfer { localhost; 192.168.100.252; };
+        file "slave/test.dom.zone";
 //        dnssec-policy default;
 };
 //
 // Reverse TESTLAB:
 //
 zone "100.168.192.in-addr.arpa" IN {
-        type master;
-        notify yes;
-        also-notify { 192.168.100.252; };
+        type slave;
+//        notify yes;
+//        also-notify { 192.168.100.252; };
         allow-transfer { localhost; 192.168.100.252; };
-        file "arpa.test.dom.zone";
+        file "slave/arpa.test.dom.zone";
 //        dnssec-policy default;
 };
 //
 // Forwarding for OFFICE.test.dom domain and subdomains
 //
 zone "office.test.dom" {
-        type forward;
-        forwarders { 192.168.100.252; };
+        type master;
+        notify yes;
+        also-notify { 192.168.100.251; };
+        allow-transfer { localhost; };
+        file "office.test.dom.zone";
+//        dnssec-policy default;
 };
 //
 zone "." IN {
@@ -134,28 +146,26 @@ nano /var/lib/bind/etc/local.conf
 ---------------------------------------------------------------------------------------------------------------------
 # Then the same way we create the zone files:
 
-cat > /var/lib/bind/zone/test.dom.zone <<<'$TTL 1D
-@ IN SOA test.dom. root.test.dom. (
+cat > /var/lib/bind/zone/office.test.dom.zone <<<'$TTL 1D
+@ IN SOA office.test.dom. root.office.test.dom. (
                   2024060101    ; serial
                   12H           ; refresh
                   1H            ; retry
                   1W            ; expire
                   1H            ; ncache
                   )
-     IN    NS     altsrv1
      IN    NS     altsrv2
            MX 10  altsrv1
-altsrv1    A      192.168.100.251
 altsrv2    A      192.168.100.252
 www        CNAME  altsrv3
-altwks1    A      192.168.100.250
-altsrv3    A      192.168.100.253
+astra1     A      192.168.100.241
+astra3     A      192.168.100.243
 '
 
 #check and next
 
-cat > /var/lib/bind/zone/arpa.test.dom.zone <<<'$TTL 1D
-@ IN SOA test.dom. root.test.dom. (
+cat > /var/lib/bind/zone/arpa.office.test.dom.zone <<<'$TTL 1D
+@ IN SOA office.test.dom. root.office.test.dom. (
 ;            2024060101 10800 1800 3600000 259200
                                         2024060101      ; serial
                                         1D              ; refresh
@@ -163,12 +173,10 @@ cat > /var/lib/bind/zone/arpa.test.dom.zone <<<'$TTL 1D
                                         1W              ; expire
                                         3H              ; minimum
                                         )
-        IN NS    altsrv1.test.dom.
-        IN NS    altsrv2.test.dom.
-251      IN PTR   altsrv1.test.dom.
-252      IN PTR   altsrv2.test.dom.
-253      IN PTR   altsrv13.test.dom.
-250      IN PTR   altwks1.test.dom.
+        IN NS    altsrv2.office.test.dom.
+252      IN PTR   altsrv2.office.test.dom.
+243      IN PTR   astra3.office.test.dom.
+241      IN PTR   astra1.office.test.dom.
 '
 ---------------------------------------------------------------------------------------------------------------------
 #
@@ -182,7 +190,7 @@ cat > /var/lib/bind/etc/options.conf <<<'options {
         recursing-file "/var/run/recursing";
         pid-file none;
 //        listen-on { 127.0.0.1; 192.168.100.251; };
-        listen-on port 53 { 127.0.0.1; 192.168.100.251; };
+        listen-on port 53 { 127.0.0.1; 192.168.100.252; };
         forward only;
         forwarders { 192.168.100.253; };
 //        allow-query { localnets; };
@@ -242,37 +250,37 @@ acl "local-dns-gw-server" {
 };
 //
 logging {
-//        channel default_debug {
-//              file "/var/log/named.run" versions 10 size 20m;
-//              print-time yes;
-//              print-category yes;
-//              print-severity yes;
-//              severity dynamic;
-//         };
-//        channel default_debug {
-//                file "/var/log/named.run" versions 10 size 20m;
-//                severity dynamic;
-//        };
+        channel default_debug {
+              file "/var/log/named.run" versions 10 size 20m;
+              print-time yes;
+              print-category yes;
+              print-severity yes;
+              severity dynamic;
+         };
+        channel default_debug {
+                file "/var/log/named.run" versions 10 size 20m;
+                severity dynamic;
+        };
 // TRANSFERS
-//        category notify { zone_transfer_log; };
-//        category xfer-in { zone_transfer_log; };
-//        category xfer-out { zone_transfer_log; };
-//        channel zone_transfer_log {
-//                file "/var/log/transfer.log" versions 10 size 50m;
-//                print-time yes;
-//                print-category yes;
-//                print-severity yes;
-//                severity info;
-//        };
+        category notify { zone_transfer_log; };
+        category xfer-in { zone_transfer_log; };
+        category xfer-out { zone_transfer_log; };
+        channel zone_transfer_log {
+                file "/var/log/transfer.log" versions 10 size 50m;
+                print-time yes;
+                print-category yes;
+                print-severity yes;
+                severity info;
+        };
 // QUERIES
-//        category queries { queries_log; };
-//        channel queries_log {
-//                file "/var/log/queries.log" versions 10 size 50m;
-//                print-time yes;
-//                print-category yes;
-//                print-severity yes;
-//                severity info;
-//        };
+        category queries { queries_log; };
+        channel queries_log {
+                file "/var/log/queries.log" versions 10 size 50m;
+                print-time yes;
+                print-category yes;
+                print-severity yes;
+                severity info;
+        };
 };
 // Controls
 controls {
