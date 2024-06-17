@@ -1,8 +1,8 @@
 ---------------------------------------------------------------------------------------------------------------------
-MASTER/SLAVE BIND LAB. MASTER PART.
+MASTER/SLAVE BIND LAB. SLAVE PART.
 (logging not enabled, option -4 not used)
 ---------------------------------------------------------------------------------------------------------------------
-AS1/MASTER:
+ATLSRV1/MASTER:
 ---------------------------------------------------------------------------------------------------------------------
 apt-get install bind bind-utils nano
 ---------------------------------------------------------------------------------------------------------------------
@@ -109,6 +109,7 @@ zone "test.dom" IN {
 //        also-notify { 192.168.100.252; };
 //        allow-transfer { localhost; 192.168.100.252; };
         file "slave/test.dom.zone";
+        primaries { 192.168.100.251; };
 //        dnssec-policy default;
 };
 //
@@ -120,6 +121,7 @@ zone "100.168.192.in-addr.arpa" IN {
 //        also-notify { 192.168.100.252; };
         allow-transfer { localhost; 192.168.100.252; };
         file "slave/arpa.test.dom.zone";
+        primaries { 192.168.100.251; };
 //        dnssec-policy default;
 };
 //
@@ -144,7 +146,7 @@ zone "." IN {
 # Use cat or nano for control:
 nano /var/lib/bind/etc/local.conf
 ---------------------------------------------------------------------------------------------------------------------
-# Then the same way we create the zone files:
+# And then the same way we'll create the zone files:
 
 cat > /var/lib/bind/zone/office.test.dom.zone <<<'$TTL 1D
 @ IN SOA office.test.dom. root.office.test.dom. (
@@ -360,17 +362,10 @@ key "rndc-key" {
 # End of named.conf
 
 ---------------------------------------------------------------------------------------------------------------------
-
-
----------------------------------------------------------------------------------------------------------------------
-use named-checkconf and fix errors if you take them
-systemctl start bind.service
-systemctl status bind.service
-journalctl -xeu bind.service
----------------------------------------------------------------------------------------------------------------------
 enabling logging in named.run, transer.log and queries.log
 ---------------------------------------------------------------------------------------------------------------------
 control bind-debug enabled
+control bind-slave enabled
 mkdir /var/lib/bind/var/log
 touch /var/lib/bind/var/log/named.run
 touch /var/lib/bind/var/log/transfer.log
@@ -390,4 +385,12 @@ cat /var/lib/bind/var/log/named.run
 cat /var/lib/bind/var/log/transfer.log
 ---------------------------------------------------------------------------------------------------------------------
 
+---------------------------------------------------------------------------------------------------------------------
+
+
+---------------------------------------------------------------------------------------------------------------------
+use named-checkconf and fix errors if you take them
+systemctl start bind.service
+systemctl status bind.service
+journalctl -xeu bind.service
 
