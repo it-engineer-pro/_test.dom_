@@ -29,13 +29,14 @@ altsrv1            IN A  192.168.100.251
 altsrv2            IN A  192.168.100.252
 altsrv3            IN A  192.168.100.253
 www                CNAME astra1
-www                IN A  192.168.100.240
+www2               CNAME astra3
 astra1             IN A  192.168.100.241
 astra3             IN A  192.168.100.243
-# Subdomain OFFICE.test.dom.
+; Subdomain OFFICE.test.dom.
 office             IN NS altsrv2.test.dom.
 altsrv2            IN A  192.168.100.252
-
+___________________________________________________________________________
+named-checkzone test.dom. /var/lib/bind/zone/test.dom.zone
 ___________________________________________________________________________
 And reverse too:
 
@@ -110,12 +111,14 @@ systemctl status bind
 ___________________________________________________________________________
 
 then go to SLAVE and create and describe zone in appropriate files
-nano /var/lib/bind/etc/local.conf 
-touch /var/lib/bind/zone/office.test.dom.zone
-touch /var/lib/bind/zone/arpa.test.dom.zone
 chown named:named /var/lib/bind/zone/office.test.dom.zone
 chown named:named /var/lib/bind/zone/arpa.test.dom.zone
 usermod -aG named sysadmin
+
+nano /var/lib/bind/etc/local.conf 
+touch /var/lib/bind/zone/office.test.dom.zone
+touch /var/lib/bind/zone/arpa.test.dom.zone
+
 newgrp sysadmin
 id sysadmin
 id -g
@@ -129,7 +132,11 @@ cat > /var/lib/bind/zone/office.test.dom.zone <<<'$TTL 1D
                                        3w
                                        1d )
                    IN NS altsrv2.test.dom.
+                      MX 10 altsrv1.test.dom.
+www                CNAME astra1.test.dom.
+www2               CNAME astra3.test.dom.
 altsrv2            IN A  192.168.100.252
+;altsrv1            IN A  192.168.100.251
 altwks1            IN A  192.168.100.250
 astra2             IN A  192.168.100.242
 '
@@ -178,13 +185,13 @@ zone "100.168.192.in-addr.arpa" IN {
 };
 
 ___________________________________________________________________________
-named-checkzone test.dom. /var/lib/bind/zone/test.dom.zone
+named-checkzone office.test.dom. /var/lib/bind/zone/office.test.dom.zone
 systemctl restart bind
 systemctl status bind
 ___________________________________________________________________________
 rename hostnames altwks1 and astra2 <<== office.test.dom
-hostnamectl altwks1.office.test.dom
-hostnamectl astra2.office.test.dom
+hostnamectl hostname altwks1.office.test.dom
+hostnamectl hostname astra2.office.test.dom
 ___________________________________________________________________________
 
 
@@ -203,8 +210,8 @@ ls -ld /var/lib/bind/zone/ddns
 drwxr-xr-x 2 named named 4096 июн 22 16:01 /var/lib/bind/zone/ddns
 ___________________________________________________________________________
 # cd /var/lib/bind
-# mv etc/company.ru zones/ddns
-# chown named:named /var/lib/bind/zone/ddns/company.ru
+# mv etc/office.test.dom zones/ddns
+# chown named:named /var/lib/bind/zone/ddns/office.test.dom
 ___________________________________________________________________________
 Создание ключа для обновления зоны DNS:
 ___________________________________________________________________________
@@ -223,9 +230,6 @@ ___________________________________________________________________________
 include "/etc/bind/ddns.key";
 zone "company.ru" {
 type master;
-ООО «Базальт СПО»
-Москва, 2023 г.Курс: ALTSERV. Инфраструктурные службы ОС Альт.
-стр. 34/121
 file "ddns/company.ru.zone";
 allow-update { key ddns-key; };
 };
