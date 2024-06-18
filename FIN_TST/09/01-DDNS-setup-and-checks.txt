@@ -336,7 +336,23 @@ systemctl restart dhcpd
 systemctl status dhcpd
 ___________________________________________________________________________
 
+for easier debug:
 ...
+stop and disable DHCPd at altsrv1
+disable DHCPd FaultTalerance on altsrv2
+disable iptables rules
+ iptables -nvL
+Chain INPUT (policy ACCEPT 6476 packets, 452K bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+ 
+Chain FORWARD (policy ACCEPT 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+ 
+Chain OUTPUT (policy ACCEPT 5574 packets, 577K bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+[root@altsrv2 dhcpd.d]#
+...
+
 ___________________________________________________________________________
 Внесение изменений в динамическую зону
 • nsupdate
@@ -376,103 +392,182 @@ ________________________________________________________________________________
 ООО «Базальт СПО»
 Москва, 2023 г.Курс: ALTSERV. Инфраструктурные службы ОС Альт.
 ___________________________________________________________________________________________________
-___________________________________________________________________________________________________
+
+Create key in dhcpd.d
+tsig-keygen -a hmac-sha256 DHCP_UPDATER >DHCP_UPDATER.key
+Check it
+[root@altsrv2 dhcpd.d]# ls -a
+.  ..  dchp_omapi.key  DHCP_UPDATER.key  failover.conf  help.txt  static.conf  subnet.conf
+[root@altsrv2 dhcpd.d]# cat DHCP_UPDATER.key
+key "DHCP_UPDATER" {
+    algorithm hmac-sha256;
+    secret "APjcp5Rrpbhii8alGJGHsKJZTxL4Pm4C8pchfaxGxpg=";
+};
+
+add it in DHCPd /etc/dhcp/dhcpd.conf
+...
+key DHCP_UPDATER {
+        algorithm hmac-sha256;
+        secret APjcp5Rrpbhii8alGJGHsKJZTxL4Pm4C8pchfaxGxpg=;
+       }
+---------
+...
+
+add it in BIND /var/lib/bind/etc/local.conf
+key DHCP_UPDATER {
+         algorithm hmac-sha256;
+         secret APjcp5Rrpbhii8alGJGHsKJZTxL4Pm4C8pchfaxGxpg=;
+};
+--
+
+//
+zone "office.test.dom" {
+        type master;
+        notify yes;
+        also-notify { localhost; 192.168.100.252; };
+        allow-transfer { localhost; 192.168.100.252;};
+        file "ddns/office.test.dom.zone";
+//        allow-update { key ddns-key; };
+          allow-update { key DHCP_UPDATER; };
+//        dnssec-policy default
+};
 
 
-dnssec-keygen -a HMAC-MD5 -b 128 -n USER DHCP_UPDATER
-
-cat Kdhcp_updater. 157 46827.key
-
-Прописать в dhcpd.conf
+full config in dhcpd.conf:
+___________________________
 ddns-update-style interim;
 authoritative;
 option netbios-scope "";
 key DHCP_UPDATER {
-         algorithm HMAC-MD5.SIG-ALG.REG.INT;
-         secret EgxIOyQglf4KAUF7lgu9yA==;
-       };
-
-       zone local.zone. {
+        algorithm hmac-sha256;
+        secret APjcp5Rrpbhii8alGJGHsKJZTxL4Pm4C8pchfaxGxpg=;
+       }
+ 
+       zone office.test.dom. {
          primary 127.0.0.1;
          key DHCP_UPDATER;
        }
-
-       zone 0.168.192.in-addr.arpa. {
+ 
+       zone 100.168.192.in-addr.arpa. {
          primary 127.0.0.1;
          key DHCP_UPDATER;
        }
-
-Задать время аренды побольше:
-
+ 
 default-lease-time 604800;
-        max-lease-time 1814400;
-       
-       
-/etc/named.conf
-
-key DHCP_UPDATER {
-         algorithm HMAC-MD5.SIG-ALG.REG.INT;
-         secret EgxIOyQglf4KAUF7lgu9yA==;
-       };
-
-       zone "local.zone" IN {
-            type master;
-            file "local.zone.db";
-            allow-update { key DHCP_UPDATER; };
-       };
-
-       zone "0.168.192.in-addr.arpa" IN {
-            type master;
-            file "192.168.0.db";
-            allow-update { key DHCP_UPDATER; };
-       };
-
-
-$ORIGIN .
-$TTL 86400      ; 1 day
-local.zone      IN SOA  ns.local.zone. postmaster.domain.org. (
-                                200216887  ; serial
-                                28800      ; refresh (8 hours)
-                                7200       ; retry (2 hours)
-                                604800     ; expire (1 week)
-                                86400      ; minimum (1 day)
-                                )
-                        NS      ns.
-$ORIGIN local.zone.                        
-ns                      A       192.168.0.202
-                        
-
-$ORIGIN .
-$TTL 86400      ; 1 day
-0.168.192.in-addr.arpa  IN SOA  ns.local.zone. postmaster.domain.org. (
-                                        2001105141 ; serial
-                                        28800      ; refresh (8 hours)
-                                        14400      ; retry (4 hours)
-                                        3600000    ; expire (5 weeks 6 days 16 hours)
-                                        86400      ; minimum (1 day)
-                                        )
-                         NS      ns.
-                         
-И попробуем динамическое обновление через nsupdate
-
-; nsupdate -d [this file]
-key DHCP_UPDATER EgxIOyQglf4KAUF7lgu9yA==
-zone local.zone
-update add virtual 86400 A 192.168.0.105
-send
-zone 0.168.192.in-addr.arpa
-update add 254 86400 PTR server.local.zone.
-send
-Должны появиться файлики .jnl.
-
-Подводные камни
-При chroot-е обращать внимание на наличие нужных файлов в chroot-ed структуре
-Обращать внимание на владельца файлов зон
-Обращать внимание на точки в описании зон
-named-checkzone — её не зря придумали! ;-)
-
-Обновление dns записей для статично прописанных хостов
-Для включения обновления dns записей для статично прописанных хостов dhcpd.conf нужно добавить:
-
+max-lease-time 1814400;
+ 
 update-static-leases on;
+
+
+----------------------------------------------------------------------------------------------------------
+tab and enter allows construct command:
+----------------------------------------------------------------------------------------------------------
+[root@altsrv2 dhcpd.d]# nsupdate -d -k DHCP_UPDATER.key
+Creating key...
+Creating key...
+namefromtext
+keycreate
+> server 127.0.0.1
+> zone office.test.dom              
+> update add astra3.office.test.dom 86400 A 192.168.100.243
+> send
+Sending update to 127.0.0.1#53
+Outgoing update query:
+;; ->>HEADER<<- opcode: UPDATE, status: NOERROR, id:  60275
+;; flags:; ZONE: 1, PREREQ: 0, UPDATE: 1, ADDITIONAL: 1
+;; ZONE SECTION:
+;office.test.dom.        IN    SOA
+ 
+;; UPDATE SECTION:
+astra3.office.test.dom.    86400    IN    A    192.168.100.243
+ 
+;; TSIG PSEUDOSECTION:
+dhcp_updater.        0    ANY    TSIG    hmac-sha256. 1718687006 300 32 YGk8IuwU3PBAVusx9uu5X9pdLZO+8WGaXaekFQHfJHc= 60275 NOERROR 0
+ 
+ 
+Reply from update query:
+;; ->>HEADER<<- opcode: UPDATE, status: NOERROR, id:  60275
+;; flags: qr; ZONE: 1, PREREQ: 0, UPDATE: 0, ADDITIONAL: 1
+;; ZONE SECTION:
+;office.test.dom.        IN    SOA
+ 
+;; TSIG PSEUDOSECTION:
+dhcp_updater.        0    ANY    TSIG    hmac-sha256. 1718687006 300 32 084kyY97hTYti7ZFhjlNdAC4a0LOvsveVCwyBQTQgcs= 60275 NOERROR 0
+
+----------------------------------------------------------------------------------------------------------
+Updated zone file
+----------------------------------------------------------------------------------------------------------
+[root@altsrv2 dhcpd.d]# cat /var/lib/bind/zone/ddns/office.test.dom.zone
+$ORIGIN .
+$TTL 86400    ; 1 day
+office.test.dom        IN SOA    office.test.dom. root.office.test.dom. (
+                2024060103 ; serial
+                43200      ; refresh (12 hours)
+                3600       ; retry (1 hour)
+                604800     ; expire (1 week)
+                3600       ; minimum (1 hour)
+                )
+            NS    altsrv2.test.dom.
+            MX    10 altsrv1.office.test.dom.
+$ORIGIN office.test.dom.
+altsrv1            A    192.168.100.251
+altsrv2            A    192.168.100.252
+altwks1            A    192.168.100.250
+astra2            A    192.168.100.242
+astra3            A    192.168.100.243
+$TTL 3600    ; 1 hour
+            TXT    "005b97cfa6294d61eeff941130c7d0d5a2"
+$TTL 86400    ; 1 day
+www            CNAME    astra1.test.dom.
+www2            CNAME    astra3.test.dom.
+----------------------------------------- 
+
+ 
+systemctl status dhcpd
+systemctl status bind
+////////////////////////////////////////////////
+hense here is some questions
+and they must be corrected
+////////////////////////////////////////////////
+signer "dhcp_updater" approved
+/key dhcp_updater: updating zone 'office.test.dom/IN': update unsuccessful: altwks1.office.test.dom/TXT: 'RRset exists (value dependent)' prerequisite not satisfied (N>
+/key dhcp_updater: signer "dhcp_updater" approved
+/key dhcp_updater: updating zone 'office.test.dom/IN': update unsuccessful: altwks1.office.test.dom: 'name not in use' prerequisite not satisfied (YXDOMAIN)
+/key dhcp_updater: signer "dhcp_updater" approved
+/key dhcp_updater: updating zone 'office.test.dom/IN': update unsuccessful: altwks1.office.test.dom/TXT: 'RRset exists (value dependent)' prerequisite not satisfied (N>
+/key dhcp_updater: signer "dhcp_updater" approved
+/key dhcp_updater: updating zone 'office.test.dom/IN': update unsuccessful: altwks1.office.test.dom: 'name not in use' prerequisite not satisfied (YXDOMAIN)
+/key dhcp_updater: signer "dhcp_updater" approved
+/key dhcp_updater: updating zone 'office.test.dom/IN': update unsuccessful: altwks1.office.test.dom/TXT: 'RRset exists (value dependent)' prerequisite not satisfied (N>
+ 
+ 
+● dhcpd.service - DHCPv4 Server Daemon
+     Loaded: loaded (/lib/systemd/system/dhcpd.service; enabled; vendor preset: disabled)
+     Active: active (running) since Tue 2024-06-18 06:57:33 MSK; 14min ago
+       Docs: man:dhcpd(8)
+             man:dhcpd.conf(5)
+    Process: 9247 ExecStartPre=/etc/chroot.d/dhcpd.all (code=exited, status=0/SUCCESS)
+   Main PID: 9374 (dhcpd)
+      Tasks: 1 (limit: 4695)
+     Memory: 9.9M
+        CPU: 317ms
+     CGroup: /system.slice/dhcpd.service
+             └─ 9374 /usr/sbin/dhcpd -4 -f --no-pid ens19
+ 
+июн 18 07:00:42 altsrv2.test.dom dhcpd[9374]: Forward map from altwks1.office.test.dom to 192.168.100.250 FAILED: Has an address record but no DHCID, not mine.
+июн 18 07:00:42 altsrv2.test.dom dhcpd[9374]: DHCPREQUEST for 192.168.100.250 from e2:37:aa:4c:45:a9 via ens19
+июн 18 07:00:42 altsrv2.test.dom dhcpd[9374]: DHCPACK on 192.168.100.250 to e2:37:aa:4c:45:a9 via ens19
+июн 18 07:00:42 altsrv2.test.dom dhcpd[9374]: Forward map from altwks1.office.test.dom to 192.168.100.250 FAILED: Has an address record but no DHCID, not mine.
+июн 18 07:00:45 altsrv2.test.dom dhcpd[9374]: DHCPREQUEST for 192.168.100.250 from e2:37:aa:4c:45:a9 via ens19
+июн 18 07:00:45 altsrv2.test.dom dhcpd[9374]: DHCPACK on 192.168.100.250 to e2:37:aa:4c:45:a9 via ens19
+июн 18 07:00:45 altsrv2.test.dom dhcpd[9374]: Forward map from altwks1.office.test.dom to 192.168.100.250 FAILED: Has an address record but no DHCID, not mine.
+июн 18 07:00:45 altsrv2.test.dom dhcpd[9374]: DHCPREQUEST for 192.168.100.250 from e2:37:aa:4c:45:a9 via ens19
+июн 18 07:00:45 altsrv2.test.dom dhcpd[9374]: DHCPACK on 192.168.100.250 to e2:37:aa:4c:45:a9 via ens19
+июн 18 07:00:45 altsrv2.test.dom dhcpd[9374]: Forward map from altwks1.office.test.dom to 192.168.100.250 FAILED: Has an address record but no DHCID, not mine.
+[root@altsrv2 dhcpd.d]#
+ 
+
+___________________________________________________________________________________________________
+
+
 
