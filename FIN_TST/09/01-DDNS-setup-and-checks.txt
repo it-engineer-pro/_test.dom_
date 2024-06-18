@@ -209,9 +209,10 @@ ___________________________________________________________________________
 ls -ld /var/lib/bind/zone/ddns
 drwxr-xr-x 2 named named 4096 июн 22 16:01 /var/lib/bind/zone/ddns
 ___________________________________________________________________________
-# cd /var/lib/bind
-# mv etc/office.test.dom zones/ddns
-# chown named:named /var/lib/bind/zone/ddns/office.test.dom
+# cd /var/lib/bind/zone
+# cp office.test.dom /root/backup/office.test.dom
+# mv office.test.dom ddns/
+# chown named:named ddns/office.test.dom
 ___________________________________________________________________________
 Создание ключа для обновления зоны DNS:
 ___________________________________________________________________________
@@ -241,7 +242,7 @@ ___________________________________________________________________________
 Дополнительно. Политики обновления
 • allow-update
 ___________________________________________________________________________
-• update-policy
+• update-policy when it WORKS the allow-update by key not works
 ___________________________________________________________________________
 • Пример описания политики
 zone "domain.ru" {
@@ -265,8 +266,8 @@ ___________________________________________________________________________
 ddns-updates on;
 ddns-update-style interim;
 include "/etc/dhcp/ddns.key";
-zone company.ru. {
-primary 192.168.50.11;
+zone office.test.dom. {
+primary 192.168.100.252;
 key ddns-key;
 }
 . . .
@@ -283,11 +284,36 @@ ___________________________________________________________________________
 DDNS для reverse-зон
 # cat /etc/dhcp/dhcpd.conf
 . . .
-zone 50.168.192.in-addr.arpa. {
-primary 192.168.50.11;
+zone 100.168.192.in-addr.arpa. {
+primary 192.168.100.252;
 key ddns-key;
 }
 . . .
+___________________________________________________________________________
+I made it on both DHCP servers of failover team
+___________________________________________________________________________
+cat /etc/dhcp/dhcpd.conf
+...
+#ddns-update-style none;
+ddns-updates on;
+ddns-update-style interim;
+include "/etc/dhcp/ddns.key";
+zone office.test.dom. {
+     primary 192.168.100.251;
+     key ddns-key;
+}
+ 
+zone 100.168.192.in-addr.arpa. {
+     primary 192.168.100.252;
+     key ddns-key;
+}
+ 
+ 
+update-static-leases on;
+... 
+___________________________________________________________________________
+
+...
 ___________________________________________________________________________
 Внесение изменений в динамическую зону
 • nsupdate
