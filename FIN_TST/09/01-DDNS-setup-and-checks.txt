@@ -311,6 +311,29 @@ zone 100.168.192.in-addr.arpa. {
  
 update-static-leases on;
 ... 
+
+cat /etc/dhcp/ddns.key
+key "ddns-key" {
+    algorithm hmac-sha512;
+    secret "Lra5swsclDrOVTfsNesKi07G9tOap8FQx7IfndxVjobxSxmxh0louDGsFzYsEAXW/UjavLSYP+aCWVuvgPnjWg==";
+};
+ 
+touch /etc/dhcp/ddns.key
+nano /etc/dhcp/ddns.key
+key "ddns-key" {
+    algorithm hmac-sha512;
+    secret "Lra5swsclDrOVTfsNesKi07G9tOap8FQx7IfndxVjobxSxmxh0louDGsFzYsEAXW/UjavLSYP+aCWVuvgPnjWg==";
+};
+
+nano /etc/dhcp/dhcpd.d/subnet.conf
+...
+option nis-domain          "office.test.dom";
+option domain-name         "office.test.dom";
+option domain-name-servers   192.168.100.252;
+
+dhcpd -t 
+systemctl restart dhcpd
+systemctl status dhcpd
 ___________________________________________________________________________
 
 ...
