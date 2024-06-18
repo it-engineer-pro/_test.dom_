@@ -378,3 +378,101 @@ ________________________________________________________________________________
 ___________________________________________________________________________________________________
 ___________________________________________________________________________________________________
 
+
+dnssec-keygen -a HMAC-MD5 -b 128 -n USER DHCP_UPDATER
+
+cat Kdhcp_updater. 157 46827.key
+
+Прописать в dhcpd.conf
+ddns-update-style interim;
+authoritative;
+option netbios-scope "";
+key DHCP_UPDATER {
+         algorithm HMAC-MD5.SIG-ALG.REG.INT;
+         secret EgxIOyQglf4KAUF7lgu9yA==;
+       };
+
+       zone local.zone. {
+         primary 127.0.0.1;
+         key DHCP_UPDATER;
+       }
+
+       zone 0.168.192.in-addr.arpa. {
+         primary 127.0.0.1;
+         key DHCP_UPDATER;
+       }
+
+Задать время аренды побольше:
+
+default-lease-time 604800;
+        max-lease-time 1814400;
+       
+       
+/etc/named.conf
+
+key DHCP_UPDATER {
+         algorithm HMAC-MD5.SIG-ALG.REG.INT;
+         secret EgxIOyQglf4KAUF7lgu9yA==;
+       };
+
+       zone "local.zone" IN {
+            type master;
+            file "local.zone.db";
+            allow-update { key DHCP_UPDATER; };
+       };
+
+       zone "0.168.192.in-addr.arpa" IN {
+            type master;
+            file "192.168.0.db";
+            allow-update { key DHCP_UPDATER; };
+       };
+
+
+$ORIGIN .
+$TTL 86400      ; 1 day
+local.zone      IN SOA  ns.local.zone. postmaster.domain.org. (
+                                200216887  ; serial
+                                28800      ; refresh (8 hours)
+                                7200       ; retry (2 hours)
+                                604800     ; expire (1 week)
+                                86400      ; minimum (1 day)
+                                )
+                        NS      ns.
+$ORIGIN local.zone.                        
+ns                      A       192.168.0.202
+                        
+
+$ORIGIN .
+$TTL 86400      ; 1 day
+0.168.192.in-addr.arpa  IN SOA  ns.local.zone. postmaster.domain.org. (
+                                        2001105141 ; serial
+                                        28800      ; refresh (8 hours)
+                                        14400      ; retry (4 hours)
+                                        3600000    ; expire (5 weeks 6 days 16 hours)
+                                        86400      ; minimum (1 day)
+                                        )
+                         NS      ns.
+                         
+И попробуем динамическое обновление через nsupdate
+
+; nsupdate -d [this file]
+key DHCP_UPDATER EgxIOyQglf4KAUF7lgu9yA==
+zone local.zone
+update add virtual 86400 A 192.168.0.105
+send
+zone 0.168.192.in-addr.arpa
+update add 254 86400 PTR server.local.zone.
+send
+Должны появиться файлики .jnl.
+
+Подводные камни
+При chroot-е обращать внимание на наличие нужных файлов в chroot-ed структуре
+Обращать внимание на владельца файлов зон
+Обращать внимание на точки в описании зон
+named-checkzone — её не зря придумали! ;-)
+
+Обновление dns записей для статично прописанных хостов
+Для включения обновления dns записей для статично прописанных хостов dhcpd.conf нужно добавить:
+
+update-static-leases on;
+
