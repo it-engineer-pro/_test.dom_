@@ -187,6 +187,10 @@ drwxr-sr-x 3 sysadmin webmasters 4096 дек  6  2023 js
 
 cd /srv/public/www/mydomain/
 
+echo '<html><body>Hello from NGINX!</body></html>' > /srv/public/www/mydomain/index.html
+
+OR!
+
 cat > index.html <<<'<!DOCTYPE html>
 <html lang="en">
 <head>
