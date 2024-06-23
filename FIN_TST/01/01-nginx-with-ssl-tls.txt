@@ -340,10 +340,6 @@ cat > /etc/hosts <<<'127.0.0.1 localhost.localdomain localhost
 [root@altsrv3 sites-enabled.d]# cp /etc/nginx/keys/mydomain.ru.key /srv/config/mydomain.ru.key
 [root@altsrv3 sites-enabled.d]# mc
 
-
-
-
-
 nano /etc/unbound/unbound.conf
 #
 server:
@@ -370,11 +366,11 @@ server:
         prefetch: no
         auto-trust-anchor-file: "/var/lib/unbound/root.key"
 #
-domain-insecure: "test.dom"
-domain-insecure: "mydomain.ru"
+#domain-insecure: "test.dom"
+domain-insecure: "www.mydomain.ru"
 domain-insecure: "h5bp.test"
 #
-local-zone: "mydomain.ru." static
+local-zone: "www.mydomain.ru." static
         local-data: "www.mydomain.ru A 192.168.100.253"
         local-data-ptr: "192.168.100.253 www.mydomain.ru"
 #        local-data: "www CNAME mydomain.ru"
@@ -382,9 +378,9 @@ local-zone: "mydomain.ru." static
 local-zone: "h5bp.test." static
         local-data: "www.h5bp.test A 192.168.100.253"
 
-domain-insecure: "test.dom"
-domain-insecure: "mydomain.ru"
-domain-insecure: "h5bp.test"
+#domain-insecure: "test.dom"
+#domain-insecure: "mydomain.ru"
+#domain-insecure: "h5bp.test"
 
 # my local BIND Server:
 stub-zone:
@@ -429,9 +425,6 @@ unbound-checkconf: no errors in /var/lib/unbound/unbound.conf
 июн 20 14:28:49 altsrv3.test.dom unbound[52954]: [1718882929] unbound[52954:0] notice: init module 2: iterator
 июн 20 14:28:49 altsrv3.test.dom unbound[52954]: [1718882929] unbound[52954:0] info: start of service (unbound 1.20.0).
 июн 20 14:28:49 altsrv3.test.dom systemd[1]: Started Validating, recursive, and caching DNS resolver.
-[root@altsrv3 config]#
-
-rm: удалить обычный файл 'mydomain.ru.key'? y
 [root@altsrv3 config]#
 
 [root@altsrv3 config]# openssl req -newkey rsa:4096 -nodes -keyout mydomain.ru.key -x509 -days 365 -out mydomain.ru.crt
