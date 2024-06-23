@@ -48,3 +48,6 @@ OR:
 https://www.tecmint.com/delete-all-text-in-a-file-using-vi-editor/
 https://www.tecmint.com/learn-vi-and-vim-editor-tips-and-tricks-in-linux/
 
+another trick for quick change common content of any file
+cat /etc/apt/sources.list.d/yandex.list > /etc/apt/sources.list
+apt-get update && apt-get dist-upgrade

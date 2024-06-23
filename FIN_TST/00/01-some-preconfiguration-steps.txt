@@ -78,6 +78,8 @@ cat > /etc/hosts <<<'127.0.0.1 localhost.localdomain localhost
 192.168.100.242 astra2.test.dom astra2
 192.168.100.241 astra1.test.dom astra1'
 
+cat /etc/apt/sources.list.d/yandex.list > /etc/apt/sources.list
+apt-get update && apt-get dist-upgrade
 apt-get install unbound chrony wget bind-utils nano
 
 cat /etc/unbound/unbound.conf > /root/backup/unbound.conf.backup
