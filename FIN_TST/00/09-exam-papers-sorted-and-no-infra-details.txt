@@ -178,14 +178,25 @@ Final IP_Policies:
 - OUTPUT:
 - ICMP:
 --------------------------------------------------------------------------------------------------------------------------------------------
-
 ActiveDirectory
 https://www.altlinux.org/ActiveDirectory
 https://docs.altlinux.org/ru-RU/alt-server/10.1/html-single/alt-server/index.html#sambadc--chapter
+Глава 40. Samba 4 в роли контроллера домена Active Directory
+https://docs.altlinux.org/ru-RU/alt-server/10.1/html-single/alt-server/index.html#idm45236949404032
+ActiveDirectory/DC
+https://www.altlinux.org/ActiveDirectory/DC
+Заведение вторичного DC
+https://wiki.samba.org/index.php/Joining_a_Samba_DC_to_an_Existing_Active_Directory
+ActiveDirectory/FileShare
+https://www.altlinux.org/Samba/Fileserver/AD-auth
+https://www.altlinux.org/ActiveDirectory/FileShare
+Samba/InterdomainTrustRelationships
+https://www.altlinux.org/Samba/InterdomainTrustRelationships
+https://www.altlinux.org/Trusts
+ALT_Domain (!deprecated!)
+https://www.altlinux.org/ALT_Domain
 FreeIPA/Ansible
 https://www.altlinux.org/FreeIPA/Ansible
-ActiveDirectory/FileShare
-https://www.altlinux.org/ActiveDirectory/FileShare
 ============================================================================================================================================
     Вариант 3. SMB-сервер в составе домена AD.
     Используемые ВМ:
