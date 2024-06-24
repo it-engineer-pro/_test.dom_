@@ -1,0 +1,129 @@
+ss -tulpn
+_________
+Netid      StateRecv-Q      Send-Q  Local Address:Port   Peer Address:Port      Process
+
+### tcp *:8080   *:*  "ahttpd",pid=2796,fd=16))      
+### tcp 631    *:*  "cupsd",pid=3088,fd=4),("systemd",pid=1,fd=56))      
+
+https://learn.microsoft.com/ru-ru/troubleshoot/windows-server/active-directory/config-firewall-for-ad-domains-and-trusts
+
+Порты клиента	Порт сервера	Служба
+1024-65535/TCP	135/TCP	Сопоставитель конечных точек RPC
+1024-65535/TCP	1024-65535/TCP	RPC для LSA, SAM, сетевого входа в систему (*)
+1024-65535/TCP/UDP	389/TCP/UDP	LDAP
+1024-65535/TCP	636/TCP	LDAP SSL
+1024-65535/TCP	3268/TCP	LDAP GC
+1024-65535/TCP	3269/TCP	LDAP GC SSL
+53,1024-65535/TCP/UDP	53/TCP/UDP	DNS
+1024-65535/TCP/UDP	88/TCP/UDP	Kerberos;
+1024-65535/TCP	445/TCP	SMB
+1024-65535/TCP	1024-65535/TCP	
+================================================================================================
+#============
+# SSH Access:
+#
+tcp 0.0.0.0:22  0.0.0.0:*  "sshd",pid=3093,fd=3)) 
+tcp [::]:22  [::]:*  "sshd",pid=3093,fd=4)) 
+#============
+# Time Sync:
+#
+udp 0.0.0.0:123 0.0.0.0:*  "chronyd",pid=2819,fd=7))      
+udp127.0.0.1:323 0.0.0.0:*  "chronyd",pid=2819,fd=5))      
+udp[::1]:323 [::]:*  "chronyd",pid=2819,fd=6))      
+#============
+# DNS:
+#
+tcp [::]:53  [::]:*  "dns[master]",pid=3440,fd=46)) 
+tcp 0.0.0.0:53  0.0.0.0:*  "dns[master]",pid=3440,fd=49)) 
+udp 0.0.0.0:53  0.0.0.0:*  "dns[master]",pid=3440,fd=50)) 
+udp [::]:53  [::]:*  "dns[master]",pid=3440,fd=48)) 
+#============
+# Kerberos:
+#
+tcp [::]:464 [::]:*  "kdc(3",pid=3439,fd=37),("kdc(2",pid=3410,fd=37),("kdc(1",pid=3385,fd=37),("kdc(0",pid=3377,fd=37),("kdc[master]",pid=3357,fd=37))
+tcp 0.0.0.0:464 0.0.0.0:*  "kdc(3",pid=3439,fd=41),("kdc(2",pid=3410,fd=41),("kdc(1",pid=3385,fd=41),("kdc(0",pid=3377,fd=41),("kdc[master]",pid=3357,fd=41))
+tcp [::]:88  [::]:*  "kdc(3",pid=3439,fd=34),("kdc(2",pid=3410,fd=34),("kdc(1",pid=3385,fd=34),("kdc(0",pid=3377,fd=34),("kdc[master]",pid=3357,fd=34))
+tcp 0.0.0.0:88  0.0.0.0:*  "kdc(3",pid=3439,fd=39),("kdc(2",pid=3410,fd=39),("kdc(1",pid=3385,fd=39),("kdc(0",pid=3377,fd=39),("kdc[master]",pid=3357,fd=39))
+udp 192.168.100.251:464 0.0.0.0:*  "kdc(3",pid=3439,fd=44),("kdc(2",pid=3410,fd=44),("kdc(1",pid=3385,fd=44),("kdc(0",pid=3377,fd=44),("kdc[master]",pid=3357,fd=44))
+udp 0.0.0.0:464 0.0.0.0:*  "kdc(3",pid=3439,fd=42),("kdc(2",pid=3410,fd=42),("kdc(1",pid=3385,fd=42),("kdc(0",pid=3377,fd=42),("kdc[master]",pid=3357,fd=42))
+udp [::]:464 [::]:*  "kdc(3",pid=3439,fd=38),("kdc(2",pid=3410,fd=38),("kdc(1",pid=3385,fd=38),("kdc(0",pid=3377,fd=38),("kdc[master]",pid=3357,fd=38))
+udp [::]:88  [::]:*  "kdc(3",pid=3439,fd=36),("kdc(2",pid=3410,fd=36),("kdc(1",pid=3385,fd=36),("kdc(0",pid=3377,fd=36),("kdc[master]",pid=3357,fd=36))
+udp 192.168.100.251:88  0.0.0.0:*  "kdc(3",pid=3439,fd=43),("kdc(2",pid=3410,fd=43),("kdc(1",pid=3385,fd=43),("kdc(0",pid=3377,fd=43),("kdc[master]",pid=3357,fd=43))
+udp 0.0.0.0:88  0.0.0.0:*  "kdc(3",pid=3439,fd=40),("kdc(2",pid=3410,fd=40),("kdc(1",pid=3385,fd=40),("kdc(0",pid=3377,fd=40),("kdc[master]",pid=3357,fd=40))
+#============
+# Samba/DC
+#
+tcp 0.0.0.0:445 0.0.0.0:*  "smbd",pid=3329,fd=39))
+tcp    [::]:445 [::]:*  "smbd",pid=3329,fd=37))
+tcp 0.0.0.0:139 0.0.0.0:*  "smbd",pid=3329,fd=40))
+tcp [::]:139 [::]:*  "smbd",pid=3329,fd=38))
+udp 192.168.100.251:137 0.0.0.0:*  "nbt[master]",pid=3324,fd=29)) 
+udp 192.168.100.255:137 0.0.0.0:*  "nbt[master]",pid=3324,fd=28)) 
+udp 0.0.0.0:137 0.0.0.0:*  "nbt[master]",pid=3324,fd=22)) 
+udp 192.168.100.251:138 0.0.0.0:*  "nbt[master]",pid=3324,fd=31)) 
+udp 192.168.100.255:138 0.0.0.0:*  "nbt[master]",pid=3324,fd=30)) 
+udp 0.0.0.0:138 0.0.0.0:*  "nbt[master]",pid=3324,fd=26)) 
+#============
+# LDAP:
+#
+tcp 0.0.0.0:636 0.0.0.0:*  "ldap(3",pid=3458,fd=36),("ldap(2",pid=3456,fd=36),("ldap(1",pid=3454,fd=36),("ldap(0",pid=3452,fd=36),("ldap[master]",pid=3343,fd=36))      
+tcp [::]:636 [::]:*  "ldap(3",pid=3458,fd=32),("ldap(2",pid=3456,fd=32),("ldap(1",pid=3454,fd=32),("ldap(0",pid=3452,fd=32),("ldap[master]",pid=3343,fd=32))      
+tcp [::]:3268[::]:*  "ldap(3",pid=3458,fd=33),("ldap(2",pid=3456,fd=33),("ldap(1",pid=3454,fd=33),("ldap(0",pid=3452,fd=33),("ldap[master]",pid=3343,fd=33))      
+tcp [::]:3269[::]:*  "ldap(3",pid=3458,fd=34),("ldap(2",pid=3456,fd=34),("ldap(1",pid=3454,fd=34),("ldap(0",pid=3452,fd=34),("ldap[master]",pid=3343,fd=34))      
+tcp 0.0.0.0:3268 0.0.0.0:*  "ldap(3",pid=3458,fd=37),("ldap(2",pid=3456,fd=37),("ldap(1",pid=3454,fd=37),("ldap(0",pid=3452,fd=37),("ldap[master]",pid=3343,fd=37))      
+tcp 0.0.0.0:3269 0.0.0.0:*  "ldap(3",pid=3458,fd=38),("ldap(2",pid=3456,fd=38),("ldap(1",pid=3454,fd=38),("ldap(0",pid=3452,fd=38),("ldap[master]",pid=3343,fd=38))      
+tcp 0.0.0.0:389 0.0.0.0:*  "ldap(3",pid=3458,fd=35),("ldap(2",pid=3456,fd=35),("ldap(1",pid=3454,fd=35),("ldap(0",pid=3452,fd=35),("ldap[master]",pid=3343,fd=35))      
+tcp [::]:389 [::]:*  "ldap(3",pid=3458,fd=30),("ldap(2",pid=3456,fd=30),("ldap(1",pid=3454,fd=30),("ldap(0",pid=3452,fd=30),("ldap[master]",pid=3343,fd=30))      
+udp 192.168.100.251:389 0.0.0.0:*  "cldap[master]",pid=3352,fd=34))  
+udp 0.0.0.0:389 0.0.0.0:*  "cldap[master]",pid=3352,fd=32))  
+udp [::]:389 [::]:*  "cldap[master]",pid=3352,fd=22))  
+#============
+# RPC:
+#
+tcp 0.0.0.0:111 0.0.0.0:*  "rpcbind",pid=2623,fd=7))      
+tcp 0.0.0.0:49152 0.0.0.0:*  "rpc(3",pid=3379,fd=26),("rpc(2",pid=3369,fd=26),("rpc(1",pid=3360,fd=26),("rpc(0",pid=3349,fd=26),("rpc[master]",pid=3317,fd=26))
+tcp 0.0.0.0:49153 0.0.0.0:*  "rpc(0",pid=3349,fd=14))
+tcp 0.0.0.0:49154 0.0.0.0:*  "rpc(0",pid=3349,fd=25))
+tcp 0.0.0.0:135 0.0.0.0:*  "rpc(0",pid=3349,fd=33))
+tcp [::]:111 [::]:*  "rpcbind",pid=2623,fd=9))      
+tcp [::]:49152  [::]:*  "rpc(3",pid=3379,fd=24),("rpc(2",pid=3369,fd=24),("rpc(1",pid=3360,fd=24),("rpc(0",pid=3349,fd=24),("rpc[master]",pid=3317,fd=24))
+tcp [::]:49153  [::]:*  "rpc(0",pid=3349,fd=13))
+tcp [::]:49154  [::]:*  "rpc(0",pid=3349,fd=19))
+tcp [::]:135 [::]:*  "rpc(0",pid=3349,fd=32))
+udp 0.0.0.0:111 0.0.0.0:*  "rpcbind",pid=2623,fd=6))      
+udp [::]:111 [::]:*  "rpcbind",pid=2623,fd=8))      
+================================================================================================
++SSH Access : Управление. Есть в политике. 22/tcp
++Time Sync  : Синхронизация времени. Есть в политике. 123/udp,323/udp
+-DNS        : Разрешение имён: Нет в политике. Без неё не будет работать большая часть сервисов. 53/tcp, 53/udp
++Kerberos   : Ключи для AAA. Есть в политике. Не будет работать без DNS. 464/tcp,88/tcp,464/udp,88/udp
++Samba/DC   : Разрешение имён, передача данных, поддержка сессий. Есть в политике. 445/tcp,139/tcp,137/udp,138/udp
++LDAP       : Разрешение имён. Есть в политике. 636/tcp,389/tcp,3268/tcp,3269/tcp,389/udp
+-RPC        : Работа с монтированием файловых систем и каталогов. Нет в политике. Возможно не будут работать некоторые сервисы. 111/tcp,49152/tcp,49153/tcp,49154/tcp,135/tcp,111/udp
+================================================================================================
+
+$IPT -A _INPUT_TCP_LAN_IF_ -p tcp -i $SRV_IF -s $SRV_SN \
+                                     --sport $UNPR_PRTS --dport 22 \
+                                     --syn -m conntrack --ctstate NEW -j _LOG_ACCEPT_
+
+================================================================================================
+# +SSH Access
+/sbin/iptables -A -p tcp -i enp0s10 -s 192.168.100/24 --dport 22 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
+# +Time Sync 
+/sbin/iptables -A -p udp -i enp0s10 -s 192.168.100/24 --dport 123,323 --sport 1024:65535 --ctstate NEW -j ACCEPT
+# -DNS 
+/sbin/iptables -A -p tcp -i enp0s10 -s 192.168.100/24 --dport 53 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A -p udp -i enp0s10 -s 192.168.100/24 --dport 53 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
+# +Kerberos 
+/sbin/iptables -A -p tcp -i enp0s10 -s 192.168.100/24 --dport 464,88 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A -p udp -i enp0s10 -s 192.168.100/24 --dport 464,88 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
+# +Samba/DC
+/sbin/iptables -A -p tcp -i enp0s10 -s 192.168.100/24 --dport 445,139 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A -p udp -i enp0s10 -s 192.168.100/24 --dport 137,138 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
+# +LDAP 
+/sbin/iptables -A -p tcp -i enp0s10 -s 192.168.100/24 --dport 636,389,3268,3269 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A -p udp -i enp0s10 -s 192.168.100/24 --dport 389 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
+# -RPC 
+/sbin/iptables -A -p tcp -i enp0s10 -s 192.168.100/24 --dport 111,135,49152,49153,49154 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A -p udp -i enp0s10 -s 192.168.100/24 --dport 111 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
+================================================================================================
