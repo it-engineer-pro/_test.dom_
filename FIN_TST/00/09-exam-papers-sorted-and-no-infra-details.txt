@@ -183,6 +183,8 @@ https://www.altlinux.org/ActiveDirectory
 https://docs.altlinux.org/ru-RU/alt-server/10.1/html-single/alt-server/index.html#sambadc--chapter
 Глава 40. Samba 4 в роли контроллера домена Active Directory
 https://docs.altlinux.org/ru-RU/alt-server/10.1/html-single/alt-server/index.html#idm45236949404032
+https://habr.com/ru/articles/272777/
+https://vimeo.com/134560237
 ActiveDirectory/DC
 https://www.altlinux.org/ActiveDirectory/DC
 Заведение вторичного DC

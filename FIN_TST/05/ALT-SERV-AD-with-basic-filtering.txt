@@ -1,0 +1,548 @@
+ALT SERV AD with basic filtering.
+
+ALTSRV3
+Локальный Unbound и Chrony нужны, что бы наружу не летали внутренние имена и запросы DC.
+Соответственно, устанавливаем на ALTSRV3 и проверяем работу и логирование запросов.
+
+Check Unbound Local Resolver and ChronyD local time server
+[root@altsrv3 ~]# systemctl status unbound
+● unbound.service - Validating, recursive, and caching DNS resolver
+     Loaded: loaded (/lib/systemd/system/unbound.service; enabled; vendor preset: disabled)
+     Active: active (running) since Mon 2024-06-24 16:48:57 MSK; 3min 26s ago
+       Docs: man:unbound(8)
+   Main PID: 3473 (unbound)
+      Tasks: 1 (limit: 4619)
+     Memory: 9.6M
+        CPU: 167ms
+     CGroup: /system.slice/unbound.service
+             └─ 3473 /usr/sbin/unbound -p -d
+
+июн 24 16:48:57 altsrv3.test.dom systemd[1]: Starting Validating, recursive, and caching DNS resolver...
+июн 24 16:48:57 altsrv3.test.dom unbound[3473]: [3473:0] notice: init module 0: subnetcache
+июн 24 16:48:57 altsrv3.test.dom unbound[3473]: [3473:0] notice: init module 1: validator
+июн 24 16:48:57 altsrv3.test.dom unbound[3473]: [3473:0] notice: init module 2: iterator
+июн 24 16:48:57 altsrv3.test.dom systemd[1]: Started Validating, recursive, and caching DNS resolver.
+июн 24 16:48:57 altsrv3.test.dom unbound[3473]: [3473:0] info: start of service (unbound 1.20.0).
+[root@altsrv3 ~]# systemctl status chronyd.service 
+● chronyd.service - NTP client/server
+     Loaded: loaded (/lib/systemd/system/chronyd.service; enabled; vendor preset: enabled)
+     Active: active (running) since Mon 2024-06-24 16:48:45 MSK; 3min 40s ago
+       Docs: man:chronyd(8)
+             man:chrony.conf(5)
+    Process: 2716 ExecStart=/usr/sbin/chronyd $CHRONYD_ARGS (code=exited, status=0/SUCCESS)
+   Main PID: 2781 (chronyd)
+      Tasks: 1 (limit: 4619)
+     Memory: 4.2M
+        CPU: 91ms
+     CGroup: /system.slice/chronyd.service
+             └─ 2781 /usr/sbin/chronyd
+
+июн 24 16:48:44 altsrv3.test.dom systemd[1]: Starting NTP client/server...
+июн 24 16:48:44 altsrv3.test.dom chronyd[2781]: chronyd version 4.5 starting (+CMDMON +NTP +REFCLOCK +RTC +PRIVDROP +SCFILTER +SIGND +ASYNCDNS +NTS +SECHASH +IPV6 -DEBUG)
+июн 24 16:48:44 altsrv3.test.dom chronyd[2781]: Frequency -29248.000 +/- 0.017 ppm read from /var/lib/chrony/drift
+июн 24 16:48:45 altsrv3.test.dom systemd[1]: Started NTP client/server.
+июн 24 16:49:18 altsrv3.test.dom chronyd[2781]: Selected source 192.36.143.130 (ru.pool.ntp.org)
+июн 24 16:49:18 altsrv3.test.dom chronyd[2781]: System clock wrong by -1.865691 seconds
+июн 24 16:49:16 altsrv3.test.dom chronyd[2781]: System clock was stepped by -1.865691 seconds
+[root@altsrv3 ~]# date
+Пн 24 июн 2024 16:52:36 MSK
+
+[root@altsrv3 ~]# cat /etc/chrony.conf 
+pool ru.pool.ntp.org iburst
+driftfile /var/lib/chrony/drift
+makestep 1.0 3
+rtcsync
+minsources 2
+allow 192.168.100.0/24
+local stratum 10
+ntsdumpdir /var/lib/chrony
+logdir /var/log/chrony
+log measurements statistics tracking
+[root@altsrv3 ~]# 
+
+[root@altsrv3 ~]# 
+
+add some fixes in unbound.conf
+
+#       NO disable chroot
+#       chroot: ""
+#       Log to /var/lib/unbound/var/log/unbound.log
+        logfile: /var/log/unbound.log
+        verbosity: 1
+        log-queries: yes
+#
+# my local AD Server with domain:
+stub-zone:
+        name: "test.dom."
+        stub-addr: 192.168.100.251
+        stub-first: yes
+#
+
+# with chroot
+mkdir -p /var/lib/unbound/var/log
+touch /var/lib/unbound/var/log/unbound.log
+chown _unbound:_unbound /var/lib/unbound/var/log
+chown _unbound:_unbound /var/lib/unbound/var/log/unbound.log 
+chmod g+w /var/lib/unbound/var/log/unbound.log 
+[root@altsrv3 unbound]# ls -al /var/lib/unbound/var/log
+итого 8
+drwxr-xr-x 2 _unbound _unbound 4096 июн 24 17:26 .
+drwxr-xr-x 3 root     root     4096 июн 24 17:24 ..
+-rw-rw-r-- 1 _unbound _unbound    0 июн 24 17:26 unbound.log
+[root@altsrv3 unbound]# systemctl restart unbound
+[root@altsrv3 unbound]# systemctl status unbound
+● unbound.service - Validating, recursive, and caching DNS resolver
+     Loaded: loaded (/lib/systemd/system/unbound.service; enabled; vendor preset: disabled)
+     Active: active (running) since Mon 2024-06-24 17:29:38 MSK; 5s ago
+       Docs: man:unbound(8)
+   Main PID: 3828 (unbound)
+      Tasks: 1 (limit: 4619)
+     Memory: 6.3M
+        CPU: 153ms
+     CGroup: /system.slice/unbound.service
+             └─ 3828 /usr/sbin/unbound -p -d
+
+июн 24 17:29:38 altsrv3.test.dom systemd[1]: Starting Validating, recursive, and caching DNS resolver...
+июн 24 17:29:38 altsrv3.test.dom systemd[1]: Started Validating, recursive, and caching DNS resolver.
+[root@altsrv3 unbound]# 
+
+
+# with NO chroot ""
+#[root@altsrv3 config]# touch /var/log/unbound.log
+#[root@altsrv3 config]# chown _unbound:_unbound /var/log/unbound.log
+#[root@altsrv3 config]# chmod g+w /var/log/unbound.log
+
+[root@altsrv3 config]# unbound-checkconf
+unbound-checkconf: no errors in /var/lib/unbound/unbound.conf
+
+[root@altsrv3 config]# systemctl restart unbound
+[root@altsrv3 config]# systemctl status unbound
+
+cat /etc/unbound/unbound.conf
+
+  GNU nano 7.2                                                                             /etc/unbound/unbound.conf                                                                                      
+server:
+       	interface: 192.168.100.253
+        port: 53
+# point to external IP-address here
+        outgoing-interface: 192.168.92.90
+        prefer-ip4: yes
+        do-ip4: yes
+        do-ip6: no
+        do-nat64: no
+        do-udp: yes
+        do-daemonize: yes
+        access-control: 127.0.0.0/8 allow
+        access-control: 192.168.100.0/24 allow
+        pidfile: "/run/unbound/unbound.pid"
+        root-hints: "/var/lib/unbound/root.hints"
+        hide-identity: no
+        hide-version: no
+        identity: "Unbound"
+        private-address: 192.168.100.0/24
+        private-domain: "test.dom"
+        do-not-query-address: 127.0.0.1/8
+        do-not-query-localhost: yes
+        prefetch: no
+        auto-trust-anchor-file: "/var/lib/unbound/root.key"
+        #
+# my local AD Server with domain:
+        stub-zone:
+        name: "test.dom."
+        stub-addr: 192.168.100.251
+        stub-first: yes
+# setup log to file: /var/lib/unbound/var/log/unbound.log
+#        chroot: ""
+        logfile: /var/log/unbound.log
+        verbosity: 1
+        log-queries: yes
+python:
+dynlib:
+remote-control:
+        control-enable: yes
+        control-interface: 127.0.0.1
+        control-port: 8953
+forward-zone:
+      name: "."
+# point to external DNS server here
+# point to external DNS Resolver or to 8.8.8.8
+#      forward-addr: 192.168.92.11
+      forward-addr: 8.8.8.8
+      forward-first: no
+      forward-no-cache: no
+#
+
+[root@altsrv3 ~]# cat /var/lib/unbound/var/log/unbound.log 
+[1719239378] unbound[3828:0] notice: init module 0: subnetcache
+[1719239378] unbound[3828:0] notice: init module 1: validator
+[1719239378] unbound[3828:0] notice: init module 2: iterator
+[1719239378] unbound[3828:0] info: start of service (unbound 1.20.0).
+[1719240343] unbound[3828:0] info: service stopped (unbound 1.20.0).
+[1719240343] unbound[3828:0] info: server stats for thread 0: 0 queries, 0 answers from cache, 0 recursions, 0 prefetch, 0 rejected by ip ratelimiting
+[1719240343] unbound[3828:0] info: server stats for thread 0: requestlist max 0 avg 0 exceeded 0 jostled 0
+[1719240373] unbound[3636:0] notice: init module 0: subnetcache
+[1719240373] unbound[3636:0] notice: init module 1: validator
+[1719240373] unbound[3636:0] notice: init module 2: iterator
+[1719240373] unbound[3636:0] info: start of service (unbound 1.20.0).
+[root@altsrv3 ~]# ping ya.ru
+PING ya.ru (77.88.55.242) 56(84) bytes of data.
+64 bytes from ya.ru (77.88.55.242): icmp_seq=1 ttl=47 time=29.4 ms
+64 bytes from ya.ru (77.88.55.242): icmp_seq=2 ttl=47 time=29.5 ms
+^C
+--- ya.ru ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 999ms
+rtt min/avg/max/mdev = 29.398/29.473/29.549/0.075 ms
+[root@altsrv3 ~]# cat /var/lib/unbound/var/log/unbound.log 
+[1719239378] unbound[3828:0] notice: init module 0: subnetcache
+[1719239378] unbound[3828:0] notice: init module 1: validator
+[1719239378] unbound[3828:0] notice: init module 2: iterator
+[1719239378] unbound[3828:0] info: start of service (unbound 1.20.0).
+[1719240343] unbound[3828:0] info: service stopped (unbound 1.20.0).
+[1719240343] unbound[3828:0] info: server stats for thread 0: 0 queries, 0 answers from cache, 0 recursions, 0 prefetch, 0 rejected by ip ratelimiting
+[1719240343] unbound[3828:0] info: server stats for thread 0: requestlist max 0 avg 0 exceeded 0 jostled 0
+[1719240373] unbound[3636:0] notice: init module 0: subnetcache
+[1719240373] unbound[3636:0] notice: init module 1: validator
+[1719240373] unbound[3636:0] notice: init module 2: iterator
+[1719240373] unbound[3636:0] info: start of service (unbound 1.20.0).
+[1719240387] unbound[3636:0] info: 192.168.100.253 ya.ru. A IN
+[1719240387] unbound[3636:0] info: 192.168.100.253 ya.ru. AAAA IN
+[1719240387] unbound[3636:0] info: generate keytag query _ta-4f66. NULL IN
+[1719240388] unbound[3636:0] info: 192.168.100.253 242.55.88.77.in-addr.arpa. PTR IN
+[1719240389] unbound[3636:0] info: 192.168.100.253 242.55.88.77.in-addr.arpa. PTR IN
+[1719240389] unbound[3636:0] info: 192.168.100.253 ru.pool.ntp.org. A IN
+[1719240389] unbound[3636:0] info: 192.168.100.253 ru.pool.ntp.org. AAAA IN
+[root@altsrv3 ~]# 
+
+ALTSRV1
+# Проверяем состояние iptables -nvL
+и отключаем все правила, сохранив их и перезапустив из.
+# cd /etc/sysconfig/_iptables
+# ./_1-IPT-flash-script.sh
+# Затем, сохраняем правила и перезапускаем хост
+[root@altsrv1 _iptables]# iptables-save > /etc/sysconfig/iptables
+[root@altsrv1 _iptables]# reboot
+[root@altsrv1 _iptables]# Connection to altsrv1 closed by remote host.
+Connection to altsrv1 closed.
+#
+
+# После рестарта должно быть следующее:
+
+[root@altsrv1 _iptables]# iptables -nvL
+Chain INPUT (policy ACCEPT 55 packets, 2888 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+
+Chain FORWARD (policy ACCEPT 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+
+Chain OUTPUT (policy ACCEPT 37 packets, 3804 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+[root@altsrv1 _iptables]# 
+
+itables мы отключаем на время установки и отладки.
+
+# Проверяем имя и работу времени и разрешения внешних имён через наш резольвер
+# 
+[root@altsrv1 ~]# cat /etc/chrony.conf 
+server 192.168.100.253 iburst
+driftfile /var/lib/chrony/drift
+makestep 1.0 3
+rtcsync
+allow 192.168.100.0/24
+local stratum 10
+ntsdumpdir /var/lib/chrony
+logdir /var/log/chrony
+log measurements statistics tracking
+[root@altsrv1 ~]# 
+#
+[root@altsrv1 ~]# date
+Пн 24 июн 2024 19:52:20 MSK
+#
+[root@altsrv1 ~]# cat /etc/net/ifaces/enp0s10/resolv.conf
+nameserver 192.168.100.253
+#nameserver 192.168.92.11
+#search test.dom
+[root@altsrv1 ~]# 
+#
+
+
+# После этого подключаемся на ALTSRV1 и удаляем ненужные службы. 
+# В принципе, Bind можно настроить на совместную работу с ALT AD, но это отдельная тема.
+# Поэтому его не должно быть, как и avahi-daemon, и krb5kdc и slapd, и опять же bind
+
+# Перемещаем старые конфиги самбы, если они существуют.
+#
+# 
+# rm -f /etc/samba/smb.conf
+# rm -rf /var/lib/samba
+# rm -rf /var/cache/samba
+#
+# Создаём каталог для хранения копии AD.
+mkdir -p /var/lib/samba/sysvol
+# Прописываем имя в nano /etc/sysconfig/network
+HOSTNAME=altsrv1.test.dom
+#
+[root@altsrv1 ~]# hostnamectl
+ Static hostname: altsrv1.test.dom
+       Icon name: altsrv1
+         Chassis: vm
+      Machine ID: 3398311e2217f515e04ad18866662f16
+         Boot ID: c4cc028c89134d949b9d118bdfa071a2
+  Virtualization: oracle
+Operating System: ALT Server 10.2 (Mendelevium)
+     CPE OS Name: cpe:/o:alt:server:10.2
+          Kernel: Linux 5.10.166-std-def-alt1
+    Architecture: x86-64
+ Hardware Vendor: innotek GmbH
+  Hardware Model: VirtualBox
+[root@altsrv1 ~]# hostnamectl set-hostname altsrv1.test.dom
+#
+#Определяем domainname
+#
+[root@altsrv1 ~]# domainname 
+(none)
+[root@altsrv1 ~]# domainname test.dom
+[root@altsrv1 ~]# domainname 
+test.dom
+[root@altsrv1 ~]#
+#
+# Выключаем хост и делаем снимок:
+#
+#
+# ставим пакеты с SambaDC.
+apt-get install task-samba-dc
+
+[root@altsrv1 ~]# apt-get install task-samba-dc
+Чтение списков пакетов... Завершено
+Построение дерева зависимостей... Завершено
+Следующие дополнительные пакеты будут установлены:
+  admx-samba krb5-kinit ldb-tools libarchive13 libboost_iostreams1.76.0 libboost_system1.76.0 libboost_thread1.76.0 libcephfs2 libglusterfs8 libglusterfs8-api libibverbs libicu69 libjansson libldb
+  libldb-modules-ldap liblttng-ust libnl3 librados2 librdmacm libsmbclient libtalloc libtdb libtevent libwbclient lmdb-utils perl-Parse-Yapp python3-module-Pygments python3-module-astor
+  python3-module-async_generator python3-module-attrs python3-module-cffi python3-module-chardet python3-module-cryptography python3-module-dns python3-module-idna python3-module-importlib-metadata
+  python3-module-markdown python3-module-ndg python3-module-ndg-httpsclient python3-module-ntlm python3-module-openssl python3-module-outcome python3-module-pycparser python3-module-pyldb
+  python3-module-requests python3-module-samba python3-module-six python3-module-sniffio python3-module-sortedcontainers python3-module-talloc python3-module-tdb python3-module-trio
+  python3-module-urllib3 python3-module-zipp samba-client samba-common samba-common-client samba-common-libs samba-common-tools samba-dc samba-dc-client samba-dc-common samba-dc-libs samba-dcerpc
+  samba-doc samba-libs samba-pidl samba-winbind samba-winbind-clients samba-winbind-common tdb-utils
+Следующие НОВЫЕ пакеты будут установлены:
+  admx-samba krb5-kinit ldb-tools libarchive13 libboost_iostreams1.76.0 libboost_system1.76.0 libboost_thread1.76.0 libcephfs2 libglusterfs8 libglusterfs8-api libibverbs libicu69 libjansson libldb
+  libldb-modules-ldap liblttng-ust libnl3 librados2 librdmacm libsmbclient libtalloc libtdb libtevent libwbclient lmdb-utils perl-Parse-Yapp python3-module-Pygments python3-module-astor
+  python3-module-async_generator python3-module-attrs python3-module-cffi python3-module-chardet python3-module-cryptography python3-module-dns python3-module-idna python3-module-importlib-metadata
+  python3-module-markdown python3-module-ndg python3-module-ndg-httpsclient python3-module-ntlm python3-module-openssl python3-module-outcome python3-module-pycparser python3-module-pyldb
+  python3-module-requests python3-module-samba python3-module-six python3-module-sniffio python3-module-sortedcontainers python3-module-talloc python3-module-tdb python3-module-trio
+  python3-module-urllib3 python3-module-zipp samba-client samba-common samba-common-client samba-common-libs samba-common-tools samba-dc samba-dc-client samba-dc-common samba-dc-libs samba-dcerpc
+  samba-doc samba-libs samba-pidl samba-winbind samba-winbind-clients samba-winbind-common task-samba-dc tdb-utils
+0 будет обновлено, 72 новых установлено, 0 пакетов будет удалено и 0 не будет обновлено.
+Необходимо получить 48,2MB архивов.
+После распаковки потребуется дополнительно 237MB дискового пространства.
+Продолжить? [Y/n] 
+
+# Запускаем установку без вопросов:
+samba-tool domain provision --realm=test.dom --domain=test --adminpass='p@ssw0rd' --dns-backend=SAMBA_INTERNAL --option="dns forwarder=192.168.100.253" --server-role=dc
+
+# И опа!
+[root@altsrv1 ~]# samba-tool domain provision --realm=test.dom --domain=test --adminpass='p@ssw0rd' --dns-backend=SAMBA_INTERNAL --option="dns forwarder=192.168.100.253" --server-role=dc
+ERROR(<class 'samba.provision.ProvisioningError'>): Provision failed - ProvisioningError: guess_names: 'server role=auto' in /etc/samba/smb.conf must match chosen server role 'active directory domain controller'!  Please remove the smb.conf file and let provision generate it
+[root@altsrv1 ~]# rm  /etc/samba/smb.conf
+rm: удалить обычный файл '/etc/samba/smb.conf'? y
+[root@altsrv1 ~]# 
+
+# В итоге получаем примерно такой протокол установки:
+Applied Domain Update 87: 7f950403-0ab3-47f9-9730-5d7b0269f9bd
+Applied Domain Update 88: 434bb40d-dbc9-4fe7-81d4-d57229f7b080
+Applied Domain Update 89: a0c238ba-9e30-4ee6-80a6-43f731e9a5cd
+INFO 2024-06-24 20:22:03,408 pid:17433 /usr/lib64/samba-dc/python3.9/samba/provision/__init__.py #2432: A Kerberos configuration suitable for Samba AD has been generated at /var/lib/samba/private/krb5.conf
+INFO 2024-06-24 20:22:03,409 pid:17433 /usr/lib64/samba-dc/python3.9/samba/provision/__init__.py #2434: Merge the contents of this file with your system krb5.conf or replace it with this one. Do not create a symlink!
+INFO 2024-06-24 20:22:03,470 pid:17433 /usr/lib64/samba-dc/python3.9/samba/provision/__init__.py #493: Once the above files are installed, your Samba AD server will be ready to use
+INFO 2024-06-24 20:22:03,470 pid:17433 /usr/lib64/samba-dc/python3.9/samba/provision/__init__.py #498: Server Role:           active directory domain controller
+INFO 2024-06-24 20:22:03,471 pid:17433 /usr/lib64/samba-dc/python3.9/samba/provision/__init__.py #499: Hostname:              altsrv1
+INFO 2024-06-24 20:22:03,472 pid:17433 /usr/lib64/samba-dc/python3.9/samba/provision/__init__.py #500: NetBIOS Domain:        TEST
+INFO 2024-06-24 20:22:03,472 pid:17433 /usr/lib64/samba-dc/python3.9/samba/provision/__init__.py #501: DNS Domain:            test.dom
+INFO 2024-06-24 20:22:03,472 pid:17433 /usr/lib64/samba-dc/python3.9/samba/provision/__init__.py #502: DOMAIN SID:            S-1-5-21-2311687298-3821112121-1656025496
+[root@altsrv1 ~]# 
+
+#Запуск службы
+# В файл /etc/resolvconf.conf добавить строку:
+nano /etc/net/ifaces/enp0s10/resolv.conf
+#name_servers=127.0.0.1
+# обновить DNS адреса:
+resolvconf -u
+#Установить службу по умолчанию и запустите её:
+# systemctl enable --now samba
+#
+# Настройка Kerberos
+# Внести изменения в файл /etc/krb5.conf. 
+# Следует раскомментировать строку default_realm и содержимое разделов realms и domain_realm и указать название домена 
+# (обратите внимание на регистр символов), в строке dns_lookup_realm должно быть установлено значение false:
+
+includedir /etc/krb5.conf.d/
+
+[logging]
+# default = FILE:/var/log/krb5libs.log
+# kdc = FILE:/var/log/krb5kdc.log
+# admin_server = FILE:/var/log/kadmind.log
+
+[libdefaults]
+dns_lookup_kdc = true
+dns_lookup_realm = false
+ticket_lifetime = 24h
+renew_lifetime = 7d
+forwardable = true
+rdns = false
+default_realm = TEST.DOM
+# default_ccache_name = KEYRING:persistent:%{uid}
+
+[realms]
+TEST.DOM = {
+  default_domain = test.dom
+}
+
+[domain_realm]
+dc = TEST.DOM
+
+
+##
+##
+#[root@altsrv1 ~]# cat /var/lib/samba/private/krb5.conf
+#[libdefaults]
+#	default_realm = TEST.DOM
+#	dns_lookup_realm = false
+#	dns_lookup_kdc = true
+#
+#[realms]
+#TEST.DOM = {
+#	default_domain = test.dom
+#}
+#
+#[domain_realm]
+#altsrv1 = TEST.DOM
+#
+#
+
+# Проверка
+[root@altsrv1 ~]# samba-tool domain info 127.0.0.1
+Forest           : test.dom
+Domain           : test.dom
+Netbios domain   : TEST
+DC name          : altsrv1.test.dom
+DC netbios name  : ALTSRV1
+Server site      : Default-First-Site-Name
+Client site      : Default-First-Site-Name
+[root@altsrv1 ~]# 
+
+[root@altsrv1 ~]# smbclient -L localhost -Uadministrator
+Password for [TEST\administrator]:
+
+	Sharename       Type      Comment
+	---------       ----      -------
+	sysvol          Disk      
+	netlogon        Disk      
+	IPC$            IPC       IPC Service (Samba 4.19.6)
+SMB1 disabled -- no workgroup available
+[root@altsrv1 ~]# 
+
+
+[root@altsrv1 ~]# cat /etc/resolv.conf
+# Generated by resolvconf
+# Do not edit manually, use
+# /etc/net/ifaces/<interface>/resolv.conf instead.
+nameserver 192.168.100.253
+[root@altsrv1 ~]# 
+
+root@altsrv1 ~]# systemctl restart network[root@altsrv1 ~]# cat /etc/resolv.conf
+# Generated by resolvconf
+# Do not edit manually, use
+# /etc/net/ifaces/<interface>/resolv.conf instead.
+search test.dom
+nameserver 127.0.0.1
+[root@altsrv1 ~]# 
+
+[root@altsrv1 ~]# cat /etc/resolv.conf
+# Generated by resolvconf
+# Do not edit manually, use
+# /etc/net/ifaces/<interface>/resolv.conf instead.
+nameserver 127.0.0.1
+[root@altsrv1 ~]# 
+
+[root@altsrv1 ~]# cat /etc/resolv.conf
+# Generated by resolvconf
+# Do not edit manually, use
+# /etc/net/ifaces/<interface>/resolv.conf instead.
+search test.dom
+nameserver 127.0.0.1
+[root@altsrv1 ~]# 
+
+[root@altsrv1 ~]# ping mail.ru
+PING mail.ru (217.69.139.202) 56(84) bytes of data.
+64 bytes from mail.ru (217.69.139.202): icmp_seq=1 ttl=51 time=59.1 ms
+^C
+--- mail.ru ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 59.108/59.108/59.108/0.000 ms
+[root@altsrv1 ~]# ping rambler.ru
+PING rambler.ru (81.19.82.2) 56(84) bytes of data.
+64 bytes from www.rambler.ru (81.19.82.2): icmp_seq=1 ttl=52 time=12.7 ms
+^C
+--- rambler.ru ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 12.662/12.662/12.662/0.000 ms
+[root@altsrv1 ~]# 
+
+[root@altsrv1 ~]#  host test.dom
+test.dom has address 192.168.100.251
+[root@altsrv1 ~]# 
+
+[root@altsrv1 ~]# host -t A dc.test.dom.
+Host dc.test.dom. not found: 3(NXDOMAIN)
+[root@altsrv1 ~]# host -t A altsrv3.test.dom.
+Host altsrv3.test.dom. not found: 3(NXDOMAIN)
+[root@altsrv1 ~]# host -t A altsrv1.test.dom.
+altsrv1.test.dom has address 192.168.100.251
+[root@altsrv1 ~]# 
+
+[root@altsrv1 ~]# kinit administrator@TEST.DOM
+Password for administrator@TEST.DOM: 
+Warning: Your password will expire in 41 days on Пн 05 авг 2024 20:21:59
+[root@altsrv1 ~]# klist
+Ticket cache: FILE:/tmp/krb5cc_0
+Default principal: administrator@TEST.DOM
+
+Valid starting       Expires              Service principal
+24.06.2024 20:42:47  25.06.2024 06:42:47  krbtgt/TEST.DOM@TEST.DOM
+	renew until 01.07.2024 20:42:44
+[root@altsrv1 ~]# 
+
+
+##### Управление пользователями #####
+#Создать пользователя с паролем:
+samba-tool user create sa
+samba-tool user setexpiry sa
+#Удалить пользователя:
+samba-tool user delete sa
+#Отключить пользователя:
+samba-tool user disable sa
+#Включить пользователя:
+samba-tool user sa
+# Изменить пароль пользователя:
+samba-tool user setpassword sa
+# Просмотреть доступных пользователей:
+samba-tool user list
+#Например, создать и разблокировать пользователя ivanov:
+samba-tool user create ivanov --given-name='Иван Иванов' --mail-address='ivanov@test.dom'
+samba-tool user setexpiry ivanov --noexpiry
+
+[root@altsrv1 ~]# samba-tool user create ivanov --given-name='Иван Иванов' --mail-address='ivanov@test.dom'
+New Password: 
+# p@ssw0rd!23
+Retype Password: 
+User 'ivanov' added successfully
+[root@altsrv1 ~]# samba-tool user setexpiry ivanov --noexpiry
+Expiry for user 'ivanov' disabled.
+[root@altsrv1 ~]# 
+
+# Добавить имена хостов /etc/samba/lmhosts ? 
+# или не стоит?)
+[root@altsrv1 ~]# cat /etc/samba/lmhosts 
+127.0.0.1 localhost
+
+
+
+
