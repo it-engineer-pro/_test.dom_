@@ -1,0 +1,77 @@
+Вариант 2. HTTPS c сертификатом от собственного УЦ
+На ОС Альт:
+1. Создание собственного УЦ средствами Easy-RSA (на хосте altsrv2) (под пользователем root)
+УЦ – упрощенно, центр сертификации - это папка, в которой находится защищенный паролем закрытый ключ, с помощью которого будут подписаны все другие ключи. А открытая пара этого ключа должна быть добавлена во все браузеры, которые будут ему доверять.
+        1.1. Установка на узле altsrv2 пакета easy-rsa.
+$ apt-get update
+$ apt-get install easy-rsa
+        1.2. Создание рабочего каталога
+$ mkdir /srv/ca
+$ chmod 700 /srv/ca
+        1.3. Инициализация каталога инфраструктуры публичных ключей (init-pki)
+$ cd /srv/ca
+$ easyrsa init-pki
+
+        1.4. Создание удостоверяющего центра (CA) с помощью опции (build-ca). Придумайте и введите парольную фразу для УЦ, введите common-name: www.mydomain.ru.
+
+$ easyrsa build-ca
+
+        1.5. Убеждаемся, что создан самоподписанный сертификат и приватный ключ удостоверяющего центра
+/srv/ca/pki/ca.crt
+/srv/ca/pki/private/ca.key
+
+        1.6. Проверка информации о сертификате УЦ
+$ openssl x509 -text -in /srv/ca/pki/ca.crt
+
+
+
+
+2. Установка easy-rsa. Создание приватного ключа и CSR абонента (на хосте altsrv1, где будет развернут веб-сервер NGINX, и создан сайт www.mydomain.ru)
+2.1. Установка на узле altsrv1 пакета easy-rsa
+# apt-get update
+# apt-get install easy-rsa
+2.2. Cоздание рабочего каталога.
+# mkdir /srv/ca
+# chmod 700 /srv/ca
+2.3. Инициализация каталога инфраструктуры публичных ключей (init-pki)
+# cd /srv/ca
+# /easyrsa init-pki
+
+2.4. Генерация приватного ключа и CSR для сайта  www.mydomain.ru  (на вэб-ервере NGINX) на altsrv1
+ # easyrsa gen-req www.mydomain.ru nopass
+
+2.5. Убеждаемся, что созданы файлы приватного ключа и запроса на генерацию сертификата
+/srv/ca/pki/reqs/www.mydomain.ru.req
+/srv/ca/pki/private/www.mydomain.ru.key
+
+
+2.6. Проверка  содержимого приватного ключа и CSR.
+# openssl rsa -check -in /srv/ca/pki/private/www.mydomain.ru.key
+# openssl req -text -noout -verify -in /srv/ca/pki/reqs/www.mydomain.ru.req
+
+
+
+Теперь созданный запрос на выпуск сертификата www.mydomain.ru.csr отправляем на удостоверяющий центр (через флэшку, через SSH или еще как-то) для подписи, в результате которого из запроса получается сертификат. 
+2.7. Подпись CSR в УЦ (на хосте altsrv2).
+Доставим в УЦ запрос на выпуск сертификата www.mydomain.ru.csr (доставили через SSH утилитой scp, хотя можно и через cat, путем копирования содержания, и создания аналогичного по имени и содержания файл www.mydomain.ru.csr уже на виртуальной машине, где находится УЦ).
+Доставка в УЦ запрос на выпуск сертификата www.mydomain.ru.csr через ssh утилитой scp
+
+2.8. В  УЦ (на хосте altsrv2) выполним импорт CSR-запроса.
+# easyrsa import-req /home/sysadmin/www.mydomain.ru.req www.mydomain.ru
+
+
+2.9. В  УЦ (на хосте altsrv2) выполним подпись CSR-запроса приватным ключем УЦ.
+# easyrsa sign-req server www.mydomain.ru
+
+При помощи утилиты openssl ознакомьтесь с содержимым сгенерированного сертификата и убеждаемся, что сертификат имеет в параметре X.509 Extended Key Usage значение TLS Web Server Authentication
+# openssl x509 -noout -text -in /srv/ca/pki/issued/www.mydomain.ru.crt
+
+
+
+2.9. Передача сгенерированного сертификата (/srv/ca/pki/issued/ www.mydomain.ru) и сертификата УЦ (/srv/ca/pki/ca.crt) на сервер altsrv1  в каталог /srv/ca/pki с помощью scp. 
+[root@altsrv2 ca]# scp /srv/ca/pki/issued/www.mydomain.ru.crt sysadmin@192.168.100.251:/home/sysadmin/
+[root@altsrv2 ca]# scp /srv/ca/pki/ca.crt sysadmin@192.168.100.251:/home/sysadmin/
+
+
+Таким образом, для хоста altsrv1, где будет развернут вэб-сервер nginx, созданы сертификат (публичный ключ шифрования) и приватный/закрытый ключ, для расшифровки трафика для вэб-сайта с адресом www.mydomain.ru , а также есть сертификат УЦ (сертификат УЦ нужно будет добавить в базу сертификатов браузера в клиентских ПК):
+ 

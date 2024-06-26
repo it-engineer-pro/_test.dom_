@@ -108,22 +108,23 @@ $IPT -A _INPUT_TCP_LAN_IF_ -p tcp -i $SRV_IF -s $SRV_SN \
 
 ================================================================================================
 # +SSH Access
-/sbin/iptables -A -p tcp -i enp0s10 -s 192.168.100/24 --dport 22 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A INPUT -p tcp -i enp0s10 -s 192.168.100/24 --dport 22 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
 # +Time Sync 
-/sbin/iptables -A -p udp -i enp0s10 -s 192.168.100/24 --dport 123,323 --sport 1024:65535 --ctstate NEW -j ACCEPT
+/sbin/iptables -A INPUT -p udp -i enp0s10 -s 192.168.100/24 --dport 123,323 --sport 1024:65535 --ctstate NEW -j ACCEPT
 # -DNS 
-/sbin/iptables -A -p tcp -i enp0s10 -s 192.168.100/24 --dport 53 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
-/sbin/iptables -A -p udp -i enp0s10 -s 192.168.100/24 --dport 53 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A INPUT -p tcp -i enp0s10 -s 192.168.100/24 --dport 53 --sport r1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A INPUT -p udp -i enp0s10 -s 192.168.100/24 --dport 53 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
 # +Kerberos 
-/sbin/iptables -A -p tcp -i enp0s10 -s 192.168.100/24 --dport 464,88 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
-/sbin/iptables -A -p udp -i enp0s10 -s 192.168.100/24 --dport 464,88 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A INPUT -p tcp -i enp0s10 -s 192.168.100/24 --dport 464,88 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A INPUT -p udp -i enp0s10 -s 192.168.100/24 --dport 464,88 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
 # +Samba/DC
-/sbin/iptables -A -p tcp -i enp0s10 -s 192.168.100/24 --dport 445,139 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
-/sbin/iptables -A -p udp -i enp0s10 -s 192.168.100/24 --dport 137,138 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A INPUT -p tcp -i enp0s10 -s 192.168.100/24 --dport 445,139 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A INPUT -p udp -i enp0s10 -s 192.168.100/24 --dport 137,138 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
 # +LDAP 
-/sbin/iptables -A -p tcp -i enp0s10 -s 192.168.100/24 --dport 636,389,3268,3269 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
-/sbin/iptables -A -p udp -i enp0s10 -s 192.168.100/24 --dport 389 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A INPUT -p tcp -i enp0s10 -s 192.168.100/24 --dport 636,389,3268,3269 --sport 1025:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A INPUT -p udp -i enp0s10 -s 192.168.100/24 --dport 389 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
 # -RPC 
-/sbin/iptables -A -p tcp -i enp0s10 -s 192.168.100/24 --dport 111,135,49152,49153,49154 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
-/sbin/iptables -A -p udp -i enp0s10 -s 192.168.100/24 --dport 111 --sport 1024:65535 -m conntrack --ctstate NEW -j ACCEPT
+/sbin/iptables -A INPUT -p tcp -i enp0s10 -s 192.168.100/24 --dport 111,135,49152,49153,49154 --sport 1024:65535 --syn -m conntrack --ctstate NEW -j ACCEPT
 ================================================================================================
+iptables - A OUTPUT -p tcp -o enp0s10 -d 192.168.175.xx --sport 1025:65535  --dport 80 —syn -m conntrack --ctstate NEW -j ACCEPT
+iptables - A OUTPUT -o enp0s10 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT

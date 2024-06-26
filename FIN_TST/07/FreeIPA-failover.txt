@@ -1,0 +1,132 @@
+Вариант 7. Отказоустойчивая конфигурация FreeIPA
+    1. если лагают команды export PATH=$PATH:/usr/sbin
+    2. после установки пакетов из резолва удалить лишнии адреса
+export PATH=$PATH:/usr/sbin
+    3. На всех машинах запустить:
+apt-get update
+apt-get dist-upgrade -y
+
+
+apt-get install ntpdate
+ntpdate pool.ntp.org
+systemctl start ntpd
+    4. Устанавливаем FreeIPA на первом сервере
+останавливаем и отключаем службы:
+service ahttpd stop 
+a2dissite 000-default_https 
+a2disport https 
+service httpd2 condreload
+
+#hostnamectl set-hostname altsrv1.test.dom
+Вносим данные в nano /etc/hosts
+192.168.100.251	altsrv1.test.dom	altsrv1
+192.168.100.252	altsrv2.test.dom	altsrv2
+Cтавим пакеты фрипа
+apt-get install freeipa-server freeipa-server-dns haveged nano -y
+systemctl enable --now haveged
+Создаем домен
+ipa-server-install
+для отката при проблемах при инсталяции 
+ipa-server-install –uninstall 
+если вылетело можно посмотреть tail /var/log/ipaserver-install.log
+
+cat /etc/resolv.conf
+search test.dom
+
+Do you want to configure integrated DNS (BIND)? [no]: yes
+Server host name [alrserv1.test.dom]: далее
+Please confirm the domain name [test.dom]:далее
+Please provide a realm name [TEST.DOM]:далее
+Directory Manager password: cтавим пароль
+ IPA admin password: ставим пароль
+Do you want to configure DNS forwarders? [yes]: no
+Do you want to search for missing reverse zones? [yes]: no
+NetBIOS domain name [TEST]:
+Do you want to configure OPENNTPD with NTP server or pool address? [no]:
+Continue to configure the system with these values? [no]: yes
+
+
+
+
+
+
+
+перезагружаем
+#kinit admin@TEST.DOM
+klist – проверка выданных билетов
+system-auth status -  проверка входа в домен
+
+вебморда - https://freeipa test.dom altsrv1 
+настройка времени
+ipa dnsrecord-add test.dom _ntp._ntp.udp --srv-priority=0 --srv-weight=100 --srv-port=123 --srv-target=altsrv1.test.dom.
+#ntpdate -q localhost проверка нтп сервера
+
+cd /var/lib/bind
+nano etc/options.conf
+
+listen-on { 127.0.0.1; 192.168.100.251;};
+allow-recursion { 192.168.100.0/24; };
+systemctl restart bind
+systemctl restart ntpd
+
+Добавляем второй сервер
+#hostnamectl set-hostname altsrv2.test.dom
+Вносим данные в nano /etc/hosts
+192.168.100.252	altsrv2.test.dom	altsrv2
+192.168.100.251 	altsrv1.test.dom 	altsrv1
+
+nano /etc/resolv.conf
+search test.dom
+nameserver 192.168.100.251
+nameserver 8.8.8.8
+
+apt-get install freeipa-client freeipa-server-dns -y
+
+ipa-client-install
+
+Do you want to configure OPENNTPD with NTP server or pool address? [no]: yes
+Enter NTP source server addresses separated by comma, or press Enter to skip: 192.168.100.251 
+Enter a NTP source pool address, or press Enter to skip:
+
+Continue to configure the system with these values? [no]: yes
+User authorized to enroll computers: admin
+Password for admin@TEST.DOM:
+РЕПЛИКАЦИЯ
+ipa-replica-install
+Password for admin@TEST.DOM:
+Continue? [no]: yes
+ipa-ca-install
+
+Добавление узлов в домен
+добавляем адрес altsrv1 как dns
+hostnamectl set-hostname altwks.test.dom
+nano /etc/resolv.conf
+search test.dom
+nameserver 192.168.100.251
+#apt-get install freeipa-client libsss_ krb5-kinit bind-utils libbind zip task-auth-freeipa
+nano /etc/hosts
+192.168.100.251 altsrv1.test.dom altsrv1
+192.168.100.252 altsrv2.test.dom altsrv2
+
+ipa-client-install
+Do you want to configure CHRONY with NTP server or pool address? [no]:yes
+Enter NTP source server addresses separated by comma, or press Enter to skip: 192.168.100.251
+Enter a NTP source pool address, or press Enter to skip:
+Continue to configure the system with these values? [no]: yes
+User authorized to enroll computers: admin
+
+Добавляем пользователей
+можно через графику
+идентификация-пользователи-активные пользователи
+ipa user-add ipauser2 --first=Name --last=LAST –password
+
+доп.команды
+ipa user-del/disable/enable/find
+
+
+
+для проверки работы можно отключить на клиенте кэширование учеток 
+ nano /etc/sssd/sssd.conf
+cache_credentials = false
+
+если все работает верно, то после входа с работающими серверами повторный вход после выключения обоих будет невозможен

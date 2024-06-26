@@ -1,0 +1,11 @@
+192.168.175.xx -- IP address Server with repo.
+# Contrtol every connection
+iptables -A OUTPUT -p tcp -o enp0s10 -d 192.168.175.xx --sport 1025:65535 --dport 80 --syn -m conntrack --ctstate NEW -j ACCEPT
+iptables -A INPUT -p tcp -i enp0s10 -s 192.168.175.xx --sport 80 --dport 1025:65535 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+# OR Control first connection
+iptables -A OUTPUT -p tcp -o enp0s10 -d 192.168.175.xx --sport 1025:65535 --dport 80 --syn -m conntrack --ctstate NEW -j ACCEPT
+iptables -A OUTPUT -o enp0s10 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -i enp0s10 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+# OR WITHOUT conntrack but 
+iptables -A OUTPUT -p tcp -o enp0s10 -d 192.168.175.xx --sport 1025:65535 --dport 80 -j ACCEPT
+iptables -A INPUT  -p tcp -i enp0s10 -s 192.168.175.xx --sport 80 --dport 1025:65535 -j ACCEPT

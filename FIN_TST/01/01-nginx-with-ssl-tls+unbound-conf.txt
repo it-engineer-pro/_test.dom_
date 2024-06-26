@@ -17,7 +17,7 @@ cd /srv/public/
 
 groupadd webmasters
 usermod -aG webmasters sysadmin
-newgrp webmasters sysadmi
+newgrp webmasters sysadmin
 
 mkdir /srv/public/www
 mkdir /srv/config
@@ -561,7 +561,7 @@ h5bp/     mydomain/
 
 journalctl -xeu nginx
 
-░░ Начат процесс запуска юнита nginx.service.
+ Начат процесс запуска юнита nginx.service.
 июн 20 23:50:12 altsrv3.test.dom nginx[57304]: nginx: [emerg] unexpected "}" in /etc/nginx/sites-enabled.d/default.conf:36
 июн 20 23:50:12 altsrv3.test.dom nginx[57304]: nginx: configuration file /etc/nginx/nginx.conf test failed
 
